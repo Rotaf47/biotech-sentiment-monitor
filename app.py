@@ -34,17 +34,21 @@ tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Manual Refresh Button
-refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data from Yahoo Finance")
+# Auto-refresh control checkbox
+auto_refresh = st.sidebar.checkbox("🔄 Enable 60-second Auto-Refresh", value=False, help="Automatically re-runs the screener every 60 seconds")
 
-# Auto-Refresh Toggle/Loop Setting
-auto_refresh = st.sidebar.checkbox("🔁 Auto-refresh every 60 seconds", value=False, help="Continuously polls Yahoo Finance every 60s when active")
+# Refresh Data button
+refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data immediately")
 
 if refresh_btn:
     st.cache_data.clear()
     if "df_results" in st.session_state:
         del st.session_state["df_results"]
     st.rerun()
+
+# Maintain execution state
+if run_scan:
+    st.session_state["is_running"] = True
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_screener_data(ticker_list):
@@ -76,64 +80,55 @@ def fetch_screener_data(ticker_list):
             
     return price_data, failed_tickers
 
-if run_scan or auto_refresh or "df_results" in st.session_state:
-    # If auto-refresh is on, ensure we clear cache to get fresh live data on each loop iteration
-    if auto_refresh and "last_fetch_time" in st.session_state:
-        if time.time() - st.session_state["last_fetch_time"] >= 60:
-            st.cache_data.clear()
-            if "df_results" in st.session_state:
-                del st.session_state["df_results"]
+if st.session_state.get("is_running", False):
+    price_data, failed_tickers = fetch_screener_data(tickers)
 
-    if run_scan or "df_results" not in st.session_state:
-        price_data, failed_tickers = fetch_screener_data(tickers)
-        st.session_state["last_fetch_time"] = time.time()
+    results = []
+    for ticker in tickers:
+        if ticker not in price_data:
+            results.append({
+                "Ticker": ticker,
+                "Previous Close ($)": None,
+                "Latest Close ($)": None,
+                "Change ($)": None,
+                "Daily Change (%)": None,
+                "Status": "No data / insufficient history"
+            })
+            continue
 
-        results = []
-        for ticker in tickers:
-            if ticker not in price_data:
-                results.append({
-                    "Ticker": ticker,
-                    "Previous Close ($)": None,
-                    "Latest Close ($)": None,
-                    "Change ($)": None,
-                    "Daily Change (%)": None,
-                    "Status": "No data / insufficient history"
-                })
-                continue
+        prices = price_data[ticker]
+        previous_close = float(prices.iloc[-2])
+        latest_close = float(prices.iloc[-1])
 
-            prices = price_data[ticker]
-            previous_close = float(prices.iloc[-2])
-            latest_close = float(prices.iloc[-1])
-
-            if previous_close == 0:
-                results.append({
-                    "Ticker": ticker,
-                    "Previous Close ($)": previous_close,
-                    "Latest Close ($)": latest_close,
-                    "Change ($)": None,
-                    "Daily Change (%)": None,
-                    "Status": "Invalid previous close"
-                })
-                continue
-
-            change = latest_close - previous_close
-            pct_change = (change / previous_close) * 100
-
+        if previous_close == 0:
             results.append({
                 "Ticker": ticker,
                 "Previous Close ($)": previous_close,
                 "Latest Close ($)": latest_close,
-                "Change ($)": change,
-                "Daily Change (%)": pct_change,
-                "Status": "OK"
+                "Change ($)": None,
+                "Daily Change (%)": None,
+                "Status": "Invalid previous close"
             })
+            continue
 
-        df = pd.DataFrame(results)
-        df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
-        df.insert(0, "Rank", range(1, len(df) + 1))
-        
-        st.session_state["df_results"] = df
-        st.session_state["failed_tickers"] = failed_tickers
+        change = latest_close - previous_close
+        pct_change = (change / previous_close) * 100
+
+        results.append({
+            "Ticker": ticker,
+            "Previous Close ($)": previous_close,
+            "Latest Close ($)": latest_close,
+            "Change ($)": change,
+            "Daily Change (%)": pct_change,
+            "Status": "OK"
+        })
+
+    df = pd.DataFrame(results)
+    df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    
+    st.session_state["df_results"] = df
+    st.session_state["failed_tickers"] = failed_tickers
 
     df = st.session_state["df_results"]
     failed_tickers = st.session_state["failed_tickers"]
@@ -290,9 +285,13 @@ if run_scan or auto_refresh or "df_results" in st.session_state:
             st.pyplot(fig)
             plt.close(fig)
 
-    # Handle the 60-second polling loop if auto-refresh is checked
+    # If auto-refresh is active, sleep and trigger rerun
     if auto_refresh:
+        st.info("⏳ Auto-refreshing in 60 seconds...")
         time.sleep(60)
+        st.cache_data.clear()
+        if "df_results" in st.session_state:
+            del st.session_state["df_results"]
         st.rerun()
 else:
-    st.info("👈 Click **Run Screener & Dashboard** or enable **Auto-refresh** in the sidebar to fetch live data and generate the graphs.")
+    st.info("👈 Click **Run Screener & Dashboard** in the sidebar to fetch live data and generate the graphs.")
