@@ -128,7 +128,7 @@ if run_scan or "df_results" in st.session_state:
     if not valid.empty:
         top = valid.iloc[0]
         bottom = valid.iloc[-1]
-        st.success(f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) # 📉 **Bottom Performer:** {bottom['Ticker']} ({bottom['Daily Change (%)']:+.2f}%)")
+        st.success(f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) & 📉 **Bottom Performer:** {bottom['Ticker']} ({bottom['Daily Change (%)']:+.2f}%)")
 
     # Display interactive dataframe
     st.subheader("📋 Stock Performance Table")
