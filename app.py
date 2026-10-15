@@ -25,7 +25,7 @@ st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
     value=", ".join(DEFAULT_TICKERS),
-    height=250
+    height=300
 )
 
 # Parse tickers
@@ -37,11 +37,8 @@ run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 # Manual Refresh Button
 refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data from Yahoo Finance")
 
-# Auto-Refresh Toggle
+# Auto-Refresh Toggle/Loop Setting
 auto_refresh = st.sidebar.checkbox("🔁 Auto-refresh every 60 seconds", value=False, help="Continuously polls Yahoo Finance every 60s when active")
-
-# Timer Display Placeholder in Sidebar
-timer_placeholder = st.sidebar.empty()
 
 if refresh_btn:
     st.cache_data.clear()
@@ -80,8 +77,16 @@ def fetch_screener_data(ticker_list):
     return price_data, failed_tickers
 
 if run_scan or auto_refresh or "df_results" in st.session_state:
+    # If auto-refresh is on, ensure we clear cache to get fresh live data on each loop iteration
+    if auto_refresh and "last_fetch_time" in st.session_state:
+        if time.time() - st.session_state["last_fetch_time"] >= 60:
+            st.cache_data.clear()
+            if "df_results" in st.session_state:
+                del st.session_state["df_results"]
+
     if run_scan or "df_results" not in st.session_state:
         price_data, failed_tickers = fetch_screener_data(tickers)
+        st.session_state["last_fetch_time"] = time.time()
 
         results = []
         for ticker in tickers:
@@ -285,17 +290,9 @@ if run_scan or auto_refresh or "df_results" in st.session_state:
             st.pyplot(fig)
             plt.close(fig)
 
-    # Real-Time Countdown Loop
+    # Handle the 60-second polling loop if auto-refresh is checked
     if auto_refresh:
-        for remaining_seconds in range(60, 0, -1):
-            timer_placeholder.info(f"⏳ **Next refresh in:** `{remaining_seconds}`s")
-            time.sleep(1)
-            
-        timer_placeholder.info("🔄 **Fetching fresh market data...**")
-        st.cache_data.clear()
-        if "df_results" in st.session_state:
-            del st.session_state["df_results"]
+        time.sleep(60)
         st.rerun()
-
 else:
     st.info("👈 Click **Run Screener & Dashboard** or enable **Auto-refresh** in the sidebar to fetch live data and generate the graphs.")
