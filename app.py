@@ -34,8 +34,8 @@ tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Replaced checkbox with a touch-friendly toggle switch (updated to 300-sec / 5-min)
-auto_refresh = st.sidebar.toggle("🔄 Enable 300-sec (5-min) Auto-Refresh", value=False, help="Automatically re-runs the screener every 300 seconds (5 minutes)")
+# Replaced checkbox with a touch-friendly toggle switch (updated to 5 min)
+auto_refresh = st.sidebar.toggle("🔄 Enable 5 min Auto-Refresh", value=False, help="Automatically re-runs the screener every 5 minutes")
 
 # Refresh Data button
 refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data immediately")
