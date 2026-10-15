@@ -287,7 +287,7 @@ if st.session_state.get("is_running", False):
 
     # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
     if auto_refresh:
-        st.info("⏳ Auto-refreshing in 300 seconds (5 minutes)...")
+        st.info("⏳ Auto-refreshing in 5 minutes...")
         time.sleep(300)
         st.cache_data.clear()
         if "df_results" in st.session_state:
