@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🧬 Biotech Stock Screener & Sentiment Dashboard")
+st.title("🧬 Biotech Monitor")
 st.markdown("Scans live biotech tickers via Yahoo Finance, ranks daily performance, and visualizes market sentiment.")
 
 # Expanded Ticker List
