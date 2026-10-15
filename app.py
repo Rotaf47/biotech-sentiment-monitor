@@ -65,7 +65,6 @@ def fetch_screener_data(ticker_list):
 
 if run_scan or "df_results" in st.session_state:
     if run_scan:
-        # Spinner removed completely here
         price_data, failed_tickers = fetch_screener_data(tickers)
 
         results = []
@@ -128,4 +127,79 @@ if run_scan or "df_results" in st.session_state:
     if not valid.empty:
         top = valid.iloc[0]
         bottom = valid.iloc[-1]
-        st.success(f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) & 📉 **Bottom
+        st.success(
+            f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) | "
+            f"📉 **Bottom Performer:** {bottom['Ticker']} ({bottom['Daily Change (%)']:+.2f}%)"
+        )
+
+    # Display interactive dataframe
+    st.subheader("📋 Stock Performance Table")
+    st.dataframe(
+        df.style.format({
+            "Previous Close ($)": "{:.4f}",
+            "Latest Close ($)": "{:.4f}",
+            "Change ($)": "{:+.4f}",
+            "Daily Change (%)": "{:+.2f}%"
+        }, na_rep="N/A"),
+        use_container_width=True
+    )
+
+    # CSV Download Button
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Results as CSV",
+        data=csv,
+        file_name=f"biotech_daily_screener_{timestamp}.csv",
+        mime="text/csv",
+    )
+
+    # ---------------------------------------------------------------------------
+    # RENDER 4-PANEL SENTIMENT DASHBOARD GRAPHS
+    # ---------------------------------------------------------------------------
+    st.markdown("---")
+    st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
+
+    clean_df = df[df["Status"] == "OK"].copy()
+    if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
+        returns = pd.to_numeric(clean_df["Daily Change (%)"], errors="coerce").dropna()
+        
+        if not returns.empty:
+            total = int(len(returns))
+            advancers = int((returns > 0).sum())
+            decliners = int((returns < 0).sum())
+            unchanged = int((returns == 0).sum())
+
+            advance_pct = advancers / total * 100
+            decline_pct = decliners / total * 100
+            unchanged_pct = unchanged / total * 100
+
+            median_return = float(returns.median())
+            mean_return = float(returns.mean())
+
+            breadth_score = advance_pct - decline_pct
+            return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
+            score = float(np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100))
+
+            if score <= -60:
+                sentiment, sentiment_color = "VERY BEARISH", "#c92a2a"
+            elif score <= -30:
+                sentiment, sentiment_color = "BEARISH", "#f08c00"
+            elif score < 0:
+                sentiment, sentiment_color = "SLIGHTLY BEARISH", "#e0a800"
+            elif score < 30:
+                sentiment, sentiment_color = "SLIGHTLY BULLISH", "#74b816"
+            elif score < 60:
+                sentiment, sentiment_color = "BULLISH", "#2f9e44"
+            else:
+                sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
+
+            fig = plt.figure(figsize=(16, 10), constrained_layout=True)
+            gs = fig.add_gridspec(2, 2, height_ratios=[0.85, 1.15], width_ratios=[1.15, 1.0])
+
+            ax_score = fig.add_subplot(gs[0, 0])
+            ax_breadth = fig.add_subplot(gs[0, 1])
+            ax_summary = fig.add_subplot(gs[1, 0])
+            ax_distribution = fig.add_subplot(gs[1, 1])
+
+            fig.suptitle("BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18
