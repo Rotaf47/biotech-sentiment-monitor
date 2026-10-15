@@ -25,7 +25,7 @@ st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
     value=", ".join(DEFAULT_TICKERS),
-    height=300
+    height=250
 )
 
 # Parse tickers
@@ -40,15 +40,13 @@ refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and 
 # Auto-Refresh Toggle
 auto_refresh = st.sidebar.checkbox("🔁 Auto-refresh every 60 seconds", value=False, help="Continuously polls Yahoo Finance every 60s when active")
 
-# Timer placeholder in sidebar
+# Timer Display Placeholder in Sidebar
 timer_placeholder = st.sidebar.empty()
 
 if refresh_btn:
     st.cache_data.clear()
     if "df_results" in st.session_state:
         del st.session_state["df_results"]
-    if "next_fetch_time" in st.session_state:
-        del st.session_state["next_fetch_time"]
     st.rerun()
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -82,24 +80,6 @@ def fetch_screener_data(ticker_list):
     return price_data, failed_tickers
 
 if run_scan or auto_refresh or "df_results" in st.session_state:
-    # Initialize or check timer window for auto-refresh
-    if auto_refresh:
-        if "next_fetch_time" not in st.session_state:
-            st.session_state["next_fetch_time"] = time.time() + 60
-
-        remaining = int(st.session_state["next_fetch_time"] - time.time())
-        if remaining > 0:
-            timer_placeholder.markdown(f"⏱️ **Next auto-run in:** `{remaining}s`")
-        else:
-            st.cache_data.clear()
-            if "df_results" in st.session_state:
-                del st.session_state["df_results"]
-            st.session_state["next_fetch_time"] = time.time() + 60
-            st.rerun()
-    else:
-        if "next_fetch_time" in st.session_state:
-            del st.session_state["next_fetch_time"]
-
     if run_scan or "df_results" not in st.session_state:
         price_data, failed_tickers = fetch_screener_data(tickers)
 
@@ -305,9 +285,17 @@ if run_scan or auto_refresh or "df_results" in st.session_state:
             st.pyplot(fig)
             plt.close(fig)
 
-    # Continuous countdown refresh loop when auto-refresh is active
+    # Real-Time Countdown Loop
     if auto_refresh:
-        time.sleep(1)
+        for remaining_seconds in range(60, 0, -1):
+            timer_placeholder.info(f"⏳ **Next refresh in:** `{remaining_seconds}`s")
+            time.sleep(1)
+            
+        timer_placeholder.info("🔄 **Fetching fresh market data...**")
+        st.cache_data.clear()
+        if "df_results" in st.session_state:
+            del st.session_state["df_results"]
         st.rerun()
+
 else:
     st.info("👈 Click **Run Screener & Dashboard** or enable **Auto-refresh** in the sidebar to fetch live data and generate the graphs.")
