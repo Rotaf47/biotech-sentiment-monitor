@@ -65,55 +65,54 @@ def fetch_screener_data(ticker_list):
 
 if run_scan or "df_results" in st.session_state:
     if run_scan:
-        with st.spinner(f"Scanning {len(tickers)} unique tickers from Yahoo Finance..."):
-            price_data, failed_tickers = fetch_screener_data(tickers)
+        price_data, failed_tickers = fetch_screener_data(tickers)
 
-            results = []
-            for ticker in tickers:
-                if ticker not in price_data:
-                    results.append({
-                        "Ticker": ticker,
-                        "Previous Close ($)": None,
-                        "Latest Close ($)": None,
-                        "Change ($)": None,
-                        "Daily Change (%)": None,
-                        "Status": "No data / insufficient history"
-                    })
-                    continue
+        results = []
+        for ticker in tickers:
+            if ticker not in price_data:
+                results.append({
+                    "Ticker": ticker,
+                    "Previous Close ($)": None,
+                    "Latest Close ($)": None,
+                    "Change ($)": None,
+                    "Daily Change (%)": None,
+                    "Status": "No data / insufficient history"
+                })
+                continue
 
-                prices = price_data[ticker]
-                previous_close = float(prices.iloc[-2])
-                latest_close = float(prices.iloc[-1])
+            prices = price_data[ticker]
+            previous_close = float(prices.iloc[-2])
+            latest_close = float(prices.iloc[-1])
 
-                if previous_close == 0:
-                    results.append({
-                        "Ticker": ticker,
-                        "Previous Close ($)": previous_close,
-                        "Latest Close ($)": latest_close,
-                        "Change ($)": None,
-                        "Daily Change (%)": None,
-                        "Status": "Invalid previous close"
-                    })
-                    continue
-
-                change = latest_close - previous_close
-                pct_change = (change / previous_close) * 100
-
+            if previous_close == 0:
                 results.append({
                     "Ticker": ticker,
                     "Previous Close ($)": previous_close,
                     "Latest Close ($)": latest_close,
-                    "Change ($)": change,
-                    "Daily Change (%)": pct_change,
-                    "Status": "OK"
+                    "Change ($)": None,
+                    "Daily Change (%)": None,
+                    "Status": "Invalid previous close"
                 })
+                continue
 
-            df = pd.DataFrame(results)
-            df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
-            df.insert(0, "Rank", range(1, len(df) + 1))
-            
-            st.session_state["df_results"] = df
-            st.session_state["failed_tickers"] = failed_tickers
+            change = latest_close - previous_close
+            pct_change = (change / previous_close) * 100
+
+            results.append({
+                "Ticker": ticker,
+                "Previous Close ($)": previous_close,
+                "Latest Close ($)": latest_close,
+                "Change ($)": change,
+                "Daily Change (%)": pct_change,
+                "Status": "OK"
+            })
+
+        df = pd.DataFrame(results)
+        df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
+        df.insert(0, "Rank", range(1, len(df) + 1))
+        
+        st.session_state["df_results"] = df
+        st.session_state["failed_tickers"] = failed_tickers
 
     df = st.session_state["df_results"]
     failed_tickers = st.session_state["failed_tickers"]
