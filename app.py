@@ -14,24 +14,9 @@ st.set_page_config(
 st.title("🧬 Biotech Stock Screener & Sentiment Dashboard")
 st.markdown("Scans live biotech tickers via Yahoo Finance, ranks daily performance, and visualizes market sentiment.")
 
-# Default Ticker List
+# Expanded Ticker List
 DEFAULT_TICKERS = [
-    "ACAD", "ACHV", "ACRS", "ADMA", "AGIO", "ALKS", "ALMS",
-    "ALNY", "ALT", "ALVO", "ALXO", "ANVS", "ARDX", "ARQT",
-    "ASMB", "ASND", "BEAM", "BHVN", "BIIB", "BNTX", "CADL",
-    "CAI", "CCCC", "CGON", "COGT", "CORT", "CRBU", "CRSP",
-    "CRVS", "CTMX", "CUE", "CYTK", "DFTX", "DNA", "DNLI",
-    "DRUG", "DTIL", "DYN", "ELTX", "ELVN", "ENTA", "ERAS",
-    "FDMT", "FTRE", "GHRS", "GLSI", "GYRE", "HALO", "IBRX",
-    "IKT", "IMCR", "IMRX", "INBX", "INO", "INVA", "IOVA",
-    "IRD", "IVVD", "KYMR", "KYTX", "LENZ", "MAZE", "MIRM",
-    "MLYS", "MRK", "NBIX", "NMRA", "NTLA", "NTRB", "NUVL",
-    "NVS", "OABI", "OMER", "OTLK", "OVID", "PDSB", "PEPG",
-    "PGEN", "PRME", "PRTA", "PTCT", "PTGX", "PVLA", "RAPP",
-    "RARE", "REPL", "RLMD", "ROIV", "RVMD", "RXRX", "SANA",
-    "SEPN", "SLDB", "SLN", "SLS", "SRPT", "STTK", "TARA",
-    "TENX", "TNGX", "TRDA", "TRVI", "UPB", "VIR", "VOR",
-    "VRTX", "XENE", "ZBIO", "ZNTL"
+    "AAPG", "AARD", "ABCL", "ABEO", "ABOS", "ABSI", "ABTS", "ABUS", "ABVC", "ABVX", "ACAD", "ACET", "ACHV", "ACIU", "ACLX", "ACOG", "ACRS", "ACRV", "ACTU", "ADAG", "ADMA", "ADRX", "ADUS", "AEMD", "AEON", "AGEN", "AGIO", "AGMB", "AKTS", "AKTX", "ALDX", "ALEC", "ALGS", "ALKS", "ALLO", "ALLR", "ALMS", "ALNY", "ALPS", "ALT", "ALVO", "ALXO", "ALZN", "AMLX", "ANAB", "ANIX", "ANL", "ANNX", "ANRO", "ANTX", "ANVS", "APLM", "APMD", "APRE", "APVO", "ARCT", "ARDX", "ARGX", "ARMP", "ARQT", "ARTV", "ARVN", "ARWR", "ASBP", "ASMB", "ASND", "ATHE", "ATNM", "ATOS", "ATRA", "ATTO", "ATYR", "AUPH", "AURA", "AUTL", "AVBP", "AVIR", "AVLN", "AVTX", "AVXL", "AXSM", "AYTU", "BBIO", "BBLG", "BBOT", "BCAX", "BCDA", "BCRX", "BCTX", "BCYC", "BDSX", "BDTX", "BEAM", "BGMS", "BHVN", "BIIB", "BIO", "BIOA", "BIOX", "BJDX", "BLRX", "BLSM", "BLTE", "BMEA", "BMRN", "BNTC", "BNTX", "BOLD", "BRTX", "BRVE", "BSEM", "BYSI", "CABA", "CADL", "CAI", "CAMP", "CAPR", "CBIO", "CBUS", "CCCC", "CDNA", "CDXS", "CELC", "CELU", "CELZ", "CGEM", "CGON", "CGTX", "CHRS", "CING", "CLDX", "CLNN", "CLPT", "CLRB", "CLRO", "CLYM", "CMPX", "CNSP", "CNSY", "CNTB", "CNTN", "CNTX", "CNXU", "COAG", "COCP", "CODX", "COGT", "CORT", "COYA", "CRBP", "CRBU", "CRDF", "CRIS", "CRMD", "CRSP", "CRVO", "CRVS", "CSBR", "CTKB", "CTMX", "CTNM", "CTOR", "CTXR", "CUE", "CUVL", "CVKD", "CVM", "CYPH", "CYRX", "CYTK", "DARE", "DBVT", "DFTX", "DMAC", "DMRA", "DNA", "DNLI", "DNTH", "DRTS", "DRUG", "DSGN", "DSTX", "DTIL", "DWTX", "DYAI", "DYN", "EBS", "ECOR", "EDIT", "EDSA", "EIKN", "ELOX", "ELTX", "ELVN", "ENGN", "ENSC", "ENTA", "ENTX", "EPRX", "EQ", "ERAS", "ERNA", "ESLA", "ETRA", "EVAX", "EVMN", "EWTX", "EXEL", "EXOZ", "EYPT", "FATE", "FBIO", "FDMT", "FDTX", "FEMY", "FENC", "FERA", "FHTX", "FLNA", "FTH", "FTRE", "FULC", "GALT", "GANX", "GENB", "GERN", "GHRS", "GLSI", "GLUE", "GMAB", "GNLX", "GNPX", "GOSS", "GOVX", "GPCR", "GRCE", "GRDX", "GRI", "GTBP", "GUTS", "GYRE", "HALO", "HBIO", "HELP", "HIND", "HOWL", "HRMY", "HRTX", "HUMA", "HURA", "HYBX", "HYFT", "HYPD", "IBIO", "IBO", "IBRX", "ICCC", "ICU", "IDYA", "IFRX", "IGC", "IKT", "IMA", "IMCR", "IMMP", "IMMX", "IMNM", "IMRX", "IMTX", "IMUX", "IMVT", "INAB", "INBX", "INCY", "INDP", "INKT", "INMB", "INO", "INSM", "INTS", "INVA", "IONS", "IOVA", "IPHA", "IPSC", "IRD", "IRON", "IVA", "IVVD", "JAGX", "JANX", "JAZZ", "JBIO", "JSPR", "KARD", "KLRA", "KLRS", "KNSA", "KOD", "KPRX", "KPTI", "KROS", "KRRO", "KRSA", "KRYS", "KTTA", "KURA", "KYMR", "KYNB", "KYTX", "KZIA", "LBRX", "LCTX", "LEGN", "LENZ", "LGND", "LGVN", "LIMN", "LIQT", "LITS", "LKFT", "LNAI", "LONA", "LPCN", "LQDA", "LRMR", "LTGO", "LTRN", "LUNG", "LXEO", "LXRX", "LYEL", "MAIA", "MANE", "MAZE", "MBIO", "MBX", "MCRB", "MDGL", "MDWD", "MDXG", "MENS", "MESO", "MGNX", "MGRX", "MGX", "MIRM", "MIST", "MLYS", "MNKD", "MNOV", "MNPR", "MOLN", "MREO", "MRNA", "MRVI", "MSLE", "MYCN", "MYGN", "NAMS", "NAUT", "NBIS", "NBIX", "NBP", "NBTX", "NCEL", "NCNA", "NERV", "NEUP", "NGEN", "NGNE", "NKTR", "NKTX", "NMRA", "NNVC", "NRIX", "NRXP", "NRXS", "NTHI", "NTLA", "NTRB", "NTRP", "NUVB", "NVCT", "NXTC", "OABI", "OBIO", "OBX", "OCGN", "OCS", "OCUL", "ODTX", "OKUR", "OKYO", "OLMA", "OMER", "ONC", "ONCO", "ONCY", "OPAL", "ORGO", "ORIC", "ORKA", "ORMP", "OSTX", "OTLK", "OXBR", "PACB", "PALI", "PBLS", "PBYI", "PCVX", "PDSB", "PEPG", "PGEN", "PHAR", "PHAT", "PHIO", "PHVS", "PLRX", "PLUR", "PLX", "PLYX", "PMN", "PMVP", "PRAX", "PRFX", "PRLD", "PRME", "PROK", "PRQR", "PRTA", "PTCT", "PTGX", "PTHS", "PTN", "PULM", "PURR", "PVLA", "PYPD", "PYXS", "QCLR", "QDEL", "QGEN", "QNRX", "QNTM", "QTRX", "QTTB", "QURE", "RADX", "RANI", "RAPP", "RARE", "RCEL", "RCKT", "RCUS", "REGN", "REPL", "REVB", "RGEN", "RGNX", "RGTX", "RIGL", "RKDA", "RLAY", "RLMD", "RLYB", "RNA", "RNAC", "RNAZ", "RNTX", "RNXT", "ROIV", "RPID", "RPRX", "RTSN", "RVMD", "RXRX", "RYTM", "SABS", "SANA", "SBFM", "SCTX", "SCYX", "SEER", "SEPN", "SER", "SERA", "SGMT", "SGP", "SHPH", "SIGA", "SILO", "SION", "SMMT", "SMTI", "SNDX", "SNGX", "SNTI", "SOPH", "SORA", "SPRB", "SPRX", "SPRY", "SPTX", "SRPT", "SRRK", "SRZN", "STOK", "STRO", "STTK", "SUSB", "SVRA", "SXTC", "SYRE", "TARA", "TARS", "TCRT", "TCRX", "TECH", "TECX", "TELO", "TENX", "TGTX", "THRD", "TIL", "TLSA", "TLSI", "TLX", "TNGX", "TNXP", "TNYA", "TPST", "TRAX", "TRDA", "TRVI", "TRXB", "TSHA", "TTRX", "TVGN", "TVRD", "TVTX", "TWST", "TXG", "TYRA", "UNCY", "UPB", "URGN", "VALN", "VANI", "VCEL", "VCRE", "VCYT", "VERA", "VERU", "VIGL", "VIR", "VKTX", "VNDA", "VOGX", "VOR", "VRAX", "VRCA", "VRDN", "VRXA", "VS", "VSTM", "VTGN", "VTVT", "VYGR", "WHWK", "WVE", "XBIO", "XBIT", "XCUR", "XENE", "XFOR", "XLO", "XNCR", "XRTX", "YARW", "YDES", "ZBIO", "ZGN", "ZLAB", "ZNTL", "ZURA", "ZVRA", "ZYBT", "ZYME"
 ]
 
 # Sidebar controls
@@ -173,7 +158,6 @@ if run_scan or "df_results" in st.session_state:
     st.markdown("---")
     st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
 
-    # Clean and parse returns for the dashboard
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
         returns = pd.to_numeric(clean_df["Daily Change (%)"], errors="coerce").dropna()
@@ -191,7 +175,6 @@ if run_scan or "df_results" in st.session_state:
             median_return = float(returns.median())
             mean_return = float(returns.mean())
 
-            # Sentiment calculation
             breadth_score = advance_pct - decline_pct
             return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
             score = float(np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100))
@@ -209,7 +192,6 @@ if run_scan or "df_results" in st.session_state:
             else:
                 sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
 
-            # Build Matplotlib figure
             fig = plt.figure(figsize=(16, 10), constrained_layout=True)
             gs = fig.add_gridspec(2, 2, height_ratios=[0.85, 1.15], width_ratios=[1.15, 1.0])
 
@@ -224,7 +206,7 @@ if run_scan or "df_results" in st.session_state:
                 ax.set_facecolor("#ffffff")
                 ax.set_axisbelow(True)
 
-            # Panel 1: Sentiment Score
+            # Panel 1
             ax_score.set_title("1. Composite Sentiment Score", fontsize=12, fontweight="bold", loc="left", pad=12)
             zone_colors = [(-100, -60, "#c92a2a"), (-60, -30, "#f08c00"), (-30, 0, "#ffd43b"),
                            (0, 30, "#94d82d"), (30, 60, "#2f9e44"), (60, 100, "#087f5b")]
@@ -243,7 +225,7 @@ if run_scan or "df_results" in st.session_state:
             ax_score.grid(axis="x", alpha=0.15)
             for spine in ax_score.spines.values(): spine.set_visible(False)
 
-            # Panel 2: Market Breadth
+            # Panel 2
             ax_breadth.set_title("2. Market Breadth", fontsize=12, fontweight="bold", loc="left", pad=12)
             breadth_labels = ["Advancing", "Declining", "Unchanged"]
             breadth_values = [advancers, decliners, unchanged]
@@ -257,7 +239,7 @@ if run_scan or "df_results" in st.session_state:
             ax_breadth.grid(axis="y", alpha=0.2)
             for spine in ["top", "right"]: ax_breadth.spines[spine].set_visible(False)
 
-            # Panel 3: Sector Summary Info Box
+            # Panel 3
             ax_summary.set_title("3. Sector Summary", fontsize=12, fontweight="bold", loc="left", pad=12)
             ax_summary.set_facecolor("#f8f9fa")
             ax_summary.set_xticks([])
@@ -272,7 +254,7 @@ if run_scan or "df_results" in st.session_state:
             ax_summary.text(0.05, 0.36, f"Stocks analyzed: {total}\nAdvancers: {advancers} ({advance_pct:.1f}%)\nDecliners: {decliners} ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean return: {mean_return:+.2f}%",
                             transform=ax_summary.transAxes, fontsize=9, linespacing=1.4, va="top")
 
-            # Panel 4: Return Distribution
+            # Panel 4
             ax_distribution.set_title("4. Daily Return Distribution", fontsize=12, fontweight="bold", loc="left", pad=12)
             display_returns = returns.clip(lower=-15, upper=15)
             ax_distribution.hist(display_returns, bins=30, color="#4c78a8", edgecolor="white", linewidth=0.7, alpha=0.88)
@@ -285,7 +267,6 @@ if run_scan or "df_results" in st.session_state:
             ax_distribution.grid(axis="y", alpha=0.2)
             for spine in ["top", "right"]: ax_distribution.spines[spine].set_visible(False)
 
-            # Display plot in Streamlit
             st.pyplot(fig)
             plt.close(fig)
 else:
