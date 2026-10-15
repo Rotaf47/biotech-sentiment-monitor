@@ -33,6 +33,16 @@ tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
+# Add Refresh Button below the run button
+refresh_btn = st.sidebar.button("🔄 Refresh Data", help="Clears cache and fetches fresh live data from Yahoo Finance")
+
+if refresh_btn:
+    st.cache_data.clear()
+    # Force a rerun to immediately compute with fresh data if results already exist
+    if "df_results" in st.session_state:
+        del st.session_state["df_results"]
+    st.rerun()
+
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_screener_data(ticker_list):
     import yfinance as yf
@@ -64,7 +74,7 @@ def fetch_screener_data(ticker_list):
     return price_data, failed_tickers
 
 if run_scan or "df_results" in st.session_state:
-    if run_scan:
+    if run_scan or "df_results" not in st.session_state:
         price_data, failed_tickers = fetch_screener_data(tickers)
 
         results = []
