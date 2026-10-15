@@ -1,1 +1,1 @@
-# biotech-screener
+# biotech-sentiment-monitor
