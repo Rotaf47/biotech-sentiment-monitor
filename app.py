@@ -29,7 +29,7 @@ tickers_input = st.sidebar.text_area(
 
 # Parse tickers
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-tickers = list(dict.fromkeys(tickers))
+tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
@@ -65,58 +65,60 @@ def fetch_screener_data(ticker_list):
 
 if run_scan or "df_results" in st.session_state:
     if run_scan:
-        price_data, failed_tickers = fetch_screener_data(tickers)
+        with st.spinner(f"Scanning {len(tickers)} unique tickers from Yahoo Finance..."):
+            price_data, failed_tickers = fetch_screener_data(tickers)
 
-        results = []
-        for ticker in tickers:
-            if ticker not in price_data:
-                results.append({
-                    "Ticker": ticker,
-                    "Previous Close ($)": None,
-                    "Latest Close ($)": None,
-                    "Change ($)": None,
-                    "Daily Change (%)": None,
-                    "Status": "No data / insufficient history"
-                })
-                continue
+            results = []
+            for ticker in tickers:
+                if ticker not in price_data:
+                    results.append({
+                        "Ticker": ticker,
+                        "Previous Close ($)": None,
+                        "Latest Close ($)": None,
+                        "Change ($)": None,
+                        "Daily Change (%)": None,
+                        "Status": "No data / insufficient history"
+                    })
+                    continue
 
-            prices = price_data[ticker]
-            previous_close = float(prices.iloc[-2])
-            latest_close = float(prices.iloc[-1])
+                prices = price_data[ticker]
+                previous_close = float(prices.iloc[-2])
+                latest_close = float(prices.iloc[-1])
 
-            if previous_close == 0:
+                if previous_close == 0:
+                    results.append({
+                        "Ticker": ticker,
+                        "Previous Close ($)": previous_close,
+                        "Latest Close ($)": latest_close,
+                        "Change ($)": None,
+                        "Daily Change (%)": None,
+                        "Status": "Invalid previous close"
+                    })
+                    continue
+
+                change = latest_close - previous_close
+                pct_change = (change / previous_close) * 100
+
                 results.append({
                     "Ticker": ticker,
                     "Previous Close ($)": previous_close,
                     "Latest Close ($)": latest_close,
-                    "Change ($)": None,
-                    "Daily Change (%)": None,
-                    "Status": "Invalid previous close"
+                    "Change ($)": change,
+                    "Daily Change (%)": pct_change,
+                    "Status": "OK"
                 })
-                continue
 
-            change = latest_close - previous_close
-            pct_change = (change / previous_close) * 100
-
-            results.append({
-                "Ticker": ticker,
-                "Previous Close ($)": previous_close,
-                "Latest Close ($)": latest_close,
-                "Change ($)": change,
-                "Daily Change (%)": pct_change,
-                "Status": "OK"
-            })
-
-        df = pd.DataFrame(results)
-        df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
-        df.insert(0, "Rank", range(1, len(df) + 1))
-        
-        st.session_state["df_results"] = df
-        st.session_state["failed_tickers"] = failed_tickers
+            df = pd.DataFrame(results)
+            df = df.sort_values(by="Daily Change (%)", ascending=False, na_position="last").reset_index(drop=True)
+            df.insert(0, "Rank", range(1, len(df) + 1))
+            
+            st.session_state["df_results"] = df
+            st.session_state["failed_tickers"] = failed_tickers
 
     df = st.session_state["df_results"]
     failed_tickers = st.session_state["failed_tickers"]
 
+    # Metrics summary
     valid = df[df["Status"] == "OK"]
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Scanned", len(tickers))
@@ -126,11 +128,9 @@ if run_scan or "df_results" in st.session_state:
     if not valid.empty:
         top = valid.iloc[0]
         bottom = valid.iloc[-1]
-        st.success(
-            f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) | "
-            f"📉 **Bottom Performer:** {bottom['Ticker']} ({bottom['Daily Change (%)']:+.2f}%)"
-        )
+        st.success(f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) & 📉 **Bottom Performer:** {bottom['Ticker']} ({bottom['Daily Change (%)']:+.2f}%)")
 
+    # Display interactive dataframe
     st.subheader("📋 Stock Performance Table")
     st.dataframe(
         df.style.format({
@@ -142,6 +142,7 @@ if run_scan or "df_results" in st.session_state:
         use_container_width=True
     )
 
+    # CSV Download Button
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -151,6 +152,9 @@ if run_scan or "df_results" in st.session_state:
         mime="text/csv",
     )
 
+    # ---------------------------------------------------------------------------
+    # RENDER 4-PANEL SENTIMENT DASHBOARD GRAPHS
+    # ---------------------------------------------------------------------------
     st.markdown("---")
     st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
 
