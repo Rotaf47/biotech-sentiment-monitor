@@ -25,7 +25,7 @@ st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
     value=", ".join(DEFAULT_TICKERS),
-    height=300
+    height=250
 )
 
 # Parse tickers
@@ -34,8 +34,8 @@ tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Auto-refresh control checkbox
-auto_refresh = st.sidebar.checkbox("🔄 Enable 60-second Auto-Refresh", value=False, help="Automatically re-runs the screener every 60 seconds")
+# Replaced checkbox with a touch-friendly toggle switch
+auto_refresh = st.sidebar.toggle("🔄 Enable 60-sec Auto-Refresh", value=False, help="Automatically re-runs the screener every 60 seconds")
 
 # Refresh Data button
 refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data immediately")
@@ -285,7 +285,7 @@ if st.session_state.get("is_running", False):
             st.pyplot(fig)
             plt.close(fig)
 
-    # If auto-refresh is active, sleep and trigger rerun
+    # If auto-refresh toggle is active, sleep and trigger rerun
     if auto_refresh:
         st.info("⏳ Auto-refreshing in 60 seconds...")
         time.sleep(60)
