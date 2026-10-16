@@ -1,5 +1,7 @@
 streamlit
 pandas
-yfinance
-matplotlib
 numpy
+matplotlib
+pytz
+alpaca-py
+yfinance
