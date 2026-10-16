@@ -7,7 +7,7 @@ import time
 
 # Page Configuration
 st.set_page_config(
-    page_title="Biotech Sentiment Monitor",
+    page_title="BMS",
     page_icon="📈",
     layout="wide"
 )
