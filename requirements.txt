@@ -1,6 +1,6 @@
 streamlit
-yfinance
-marketdata
 pandas
 numpy
 matplotlib
+yfinance
+alpaca-py
