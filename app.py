@@ -16,12 +16,16 @@ st.set_page_config(
 st.title("🧬 BSM")
 st.markdown("Scans live biotech tickers via Alpaca (during premarket) or Yahoo Finance, ranks performance, and visualizes sentiment.")
 
-# Sidebar controls for Alpaca API Credentials (pre-populated with your credentials)
+# Sidebar controls for Alpaca API Credentials
 st.sidebar.header("Alpaca API Settings")
 alpaca_api_key = st.sidebar.text_input("Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password")
 alpaca_secret_key = st.sidebar.text_input("Alpaca Secret Key", value="3Lo3FMU1TdEbvYQzAZ5XMLFre7bmzd1Lp9fDJ6PJ2czx", type="password")
 alpaca_endpoint = st.sidebar.text_input("Alpaca Endpoint", value="https://paper-api.alpaca.markets/v2")
-use_paper = st.sidebar.checkbox("Use Paper Trading URL", value=True)
+
+# Display current US Eastern Time for debugging market hours
+et_tz = pytz.timezone("US/Eastern")
+now_et = datetime.now(et_tz)
+st.sidebar.caption(f"🕒 **Current Market Time (ET):** {now_et.strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
@@ -64,46 +68,44 @@ def is_premarket_hours():
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_screener_data_alpaca(ticker_list, api_key, secret_key, base_url):
+def fetch_screener_data_alpaca(ticker_list, api_key, secret_key):
     from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.requests import StockBarsRequest
-    from alpaca.data.timeframe import TimeFrame
+    from alpaca.data.requests import StockSnapshotRequest
     from alpaca.data.enums import DataFeed
     
     price_data = {}
     failed_tickers = []
     
     try:
-        # Pass base URL and credentials explicitly
+        # Initialize Alpaca Client
         client = StockHistoricalDataClient(api_key, secret_key)
         
         batch_size = 50
         for i in range(0, len(ticker_list), batch_size):
             batch = ticker_list[i:i + batch_size]
             try:
-                request_params = StockBarsRequest(
+                # Use StockSnapshotRequest to fetch latest trade and previous close reliably
+                request_params = StockSnapshotRequest(
                     symbol_or_symbols=batch,
-                    timeframe=TimeFrame.Minute,
-                    limit=2,
                     feed=DataFeed.IEX 
                 )
-                bars = client.get_stock_bars(request_params)
+                snapshots = client.get_stock_snapshot(request_params)
                 
                 for ticker in batch:
                     try:
-                        symbol_bars = bars[ticker]
-                        if not symbol_bars:
-                            failed_tickers.append((ticker, "No premarket data returned from Alpaca"))
-                            continue
-                        
-                        prices = pd.Series([bar.close for bar in symbol_bars])
-                        if len(prices) < 2:
-                            failed_tickers.append((ticker, "Insufficient premarket history"))
-                            continue
-                        
-                        price_data[ticker] = prices
+                        if ticker in snapshots and snapshots[ticker]:
+                            snap = snapshots[ticker]
+                            prev_close = snap.previous_daily_bar.close if snap.previous_daily_bar else None
+                            latest_price = snap.latest_trade.price if snap.latest_trade else None
+                            
+                            if prev_close and latest_price:
+                                price_data[ticker] = pd.Series([prev_close, latest_price])
+                            else:
+                                failed_tickers.append((ticker, "Missing trade or close price"))
+                        else:
+                            failed_tickers.append((ticker, "No snapshot data on IEX"))
                     except Exception as e:
-                        failed_tickers.append((ticker, f"Alpaca error: {type(e).__name__}"))
+                        failed_tickers.append((ticker, f"Alpaca parse error: {type(e).__name__}"))
             except Exception as e:
                 for ticker in batch:
                     failed_tickers.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
@@ -174,7 +176,7 @@ if st.session_state.get("is_running", False):
             st.warning("⚠️ Alpaca API Keys missing in sidebar! Falling back to Yahoo Finance.")
             price_data, failed_tickers = fetch_screener_data_yfinance(tickers)
         else:
-            price_data, failed_tickers = fetch_screener_data_alpaca(tickers, alpaca_api_key, alpaca_secret_key, alpaca_endpoint)
+            price_data, failed_tickers = fetch_screener_data_alpaca(tickers, alpaca_api_key, alpaca_secret_key)
             if not price_data:
                 st.warning("⚠️ Alpaca returned no records. Falling back to Yahoo Finance.")
                 price_data, failed_tickers = fetch_screener_data_yfinance(tickers)
