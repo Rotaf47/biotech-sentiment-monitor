@@ -101,7 +101,7 @@ def fetch_screener_data(ticker_list):
     return price_data, failed_tickers
 
 if st.session_state.get("is_running", False):
-    with st.spinner("Fetching live market data in batches..."):
+    with st.spinner("Fetching live market data..."):
         price_data, failed_tickers = fetch_screener_data(tickers)
 
     results = []
