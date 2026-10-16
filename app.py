@@ -1,8 +1,9 @@
+from datetime import datetime, time as dtime
+import pytz
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 import time
 
 # Page Configuration
@@ -13,32 +14,29 @@ st.set_page_config(
 )
 
 st.title("🧬 BSM")
-st.markdown("Scans live biotech tickers via Yahoo Finance, ranks daily performance, and visualizes market sentiment.")
+st.markdown("Scans live biotech tickers via Alpaca (during premarket) or Yahoo Finance, ranks performance, and visualizes sentiment.")
 
-# Expanded Ticker List
-DEFAULT_TICKERS = [
-    "AAPG", "AARD", "ABCL", "ABEO", "ABOS", "ABSI", "ABTS", "ABUS", "ABVC", "ABVX", "ACAD", "ACET", "ACHV", "ACIU", "ACLX", "ACOG", "ACRS", "ACRV", "ACTU", "ADAG", "ADMA", "ADRX", "ADUS", "AEMD", "AEON", "AGEN", "AGIO", "AGMB", "AKTS", "AKTX", "ALDX", "ALEC", "ALGS", "ALKS", "ALLO", "ALLR", "ALMS", "ALNY", "ALPS", "ALT", "ALVO", "ALXO", "ALZN", "AMLX", "ANAB", "ANIX", "ANL", "ANNX", "ANRO", "ANTX", "ANVS", "APLM", "APMD", "APRE", "APVO", "ARCT", "ARDX", "ARGX", "ARMP", "ARQT", "ARTV", "ARVN", "ARWR", "ASBP", "ASMB", "ASND", "ATHE", "ATNM", "ATOS", "ATRA", "ATTO", "ATYR", "AUPH", "AURA", "AUTL", "AVBP", "AVIR", "AVLN", "AVTX", "AVXL", "AXSM", "AYTU", "BBIO", "BBLG", "BBOT", "BCAX", "BCDA", "BCRX", "BCTX", "BCYC", "BDSX", "BDTX", "BEAM", "BGMS", "BHVN", "BIIB", "BIO", "BIOA", "BIOX", "BJDX", "BLRX", "BLSM", "BLTE", "BMEA", "BMRN", "BNTC", "BNTX", "BOLD", "BRTX", "BRVE", "BSEM", "BYSI", "CABA", "CADL", "CAI", "CAMP", "CAPR", "CBIO", "CBUS", "CCCC", "CDNA", "CDXS", "CELC", "CELU", "CELZ", "CGEM", "CGON", "CGTX", "CHRS", "CING", "CLDX", "CLNN", "CLPT", "CLRB", "CLRO", "CLYM", "CMPX", "CNSP", "CNSY", "CNTB", "CNTN", "CNTX", "CNXU", "COAG", "COCP", "CODX", "COGT", "CORT", "COYA", "CRBP", "CRBU", "CRDF", "CRIS", "CRMD", "CRSP", "CRVO", "CRVS", "CSBR", "CTKB", "CTMX", "CTNM", "CTOR", "CTXR", "CUE", "CUVL", "CVKD", "CVM", "CYPH", "CYRX", "CYTK", "DARE", "DBVT", "DFTX", "DMAC", "DMRA", "DNA", "DNLI", "DNTH", "DRTS", "DRUG", "DSGN", "DSTX", "DTIL", "DWTX", "DYAI", "DYN", "EBS", "ECOR", "EDIT", "EDSA", "EIKN", "ELOX", "ELTX", "ELVN", "ENGN", "ENSC", "ENTA", "ENTX", "EPRX", "EQ", "ERAS", "ERNA", "ESLA", "ETRA", "EVAX", "EVMN", "EWTX", "EXEL", "EXOZ", "EYPT", "FATE", "FBIO", "FDMT", "FDTX", "FEMY", "FENC", "FERA", "FHTX", "FLNA", "FTH", "FTRE", "FULC", "GALT", "GANX", "GENB", "GERN", "GHRS", "GLSI", "GLUE", "GMAB", "GNLX", "GNPX", "GOSS", "GOVX", "GPCR", "GRCE", "GRDX", "GRI", "GTBP", "GUTS", "GYRE", "HALO", "HBIO", "HELP", "HIND", "HOWL", "HRMY", "HRTX", "HUMA", "HURA", "HYBX", "HYFT", "HYPD", "IBIO", "IBO", "IBRX", "ICCC", "ICU", "IDYA", "IFRX", "IGC", "IKT", "IMA", "IMCR", "IMMP", "IMMX", "IMNM", "IMRX", "IMTX", "IMUX", "IMVT", "INAB", "INBX", "INCY", "INDP", "INKT", "INMB", "INO", "INSM", "INTS", "INVA", "IONS", "IOVA", "IPHA", "IPSC", "IRD", "IRON", "IVA", "IVVD", "JAGX", "JANX", "JAZZ", "JBIO", "JSPR", "KARD", "KLRA", "KLRS", "KNSA", "KOD", "KPRX", "KPTI", "KROS", "KRRO", "KRSA", "KRYS", "KTTA", "KURA", "KYMR", "KYNB", "KYTX", "KZIA", "LBRX", "LCTX", "LEGN", "LENZ", "LGND", "LGVN", "LIMN", "LIQT", "LITS", "LKFT", "LNAI", "LONA", "LPCN", "LQDA", "LRMR", "LTGO", "LTRN", "LUNG", "LXEO", "LXRX", "LYEL", "MAIA", "MANE", "MAZE", "MBIO", "MBX", "MCRB", "MDGL", "MDWD", "MDXG", "MENS", "MESO", "MGNX", "MGRX", "MGX", "MIRM", "MIST", "MLYS", "MNKD", "MNOV", "MNPR", "MOLN", "MREO", "MRNA", "MRVI", "MSLE", "MYCN", "MYGN", "NAMS", "NAUT", "NBIS", "NBIX", "NBP", "NBTX", "NCEL", "NCNA", "NERV", "NEUP", "NGEN", "NGNE", "NKTR", "NKTX", "NMRA", "NNVC", "NRIX", "NRXP", "NRXS", "NTHI", "NTLA", "NTRB", "NTRP", "NUVB", "NVCT", "NXTC", "OABI", "OBIO", "OBX", "OCGN", "OCS", "OCUL", "ODTX", "OKUR", "OKYO", "OLMA", "OMER", "ONC", "ONCO", "ONCY", "OPAL", "ORGO", "ORIC", "ORKA", "ORMP", "OSTX", "OTLK", "OXBR", "PACB", "PALI", "PBLS", "PBYI", "PCVX", "PDSB", "PEPG", "PGEN", "PHAR", "PHAT", "PHIO", "PHVS", "PLRX", "PLUR", "PLX", "PLYX", "PMN", "PMVP", "PRAX", "PRFX", "PRLD", "PRME", "PROK", "PRQR", "PRTA", "PTCT", "PTGX", "PTHS", "PTN", "PULM", "PURR", "PVLA", "PYPD", "PYXS", "QCLR", "QDEL", "QGEN", "QNRX", "QNTM", "QTRX", "QTTB", "QURE", "RADX", "RANI", "RAPP", "RARE", "RCEL", "RCKT", "RCUS", "REGN", "REPL", "REVB", "RGEN", "RGNX", "RGTX", "RIGL", "RKDA", "RLAY", "RLMD", "RLYB", "RNA", "RNAC", "RNAZ", "RNTX", "RNXT", "ROIV", "RPID", "RPRX", "RTSN", "RVMD", "RXRX", "RYTM", "SABS", "SANA", "SBFM", "SCTX", "SCYX", "SEER", "SEPN", "SER", "SERA", "SGMT", "SGP", "SHPH", "SIGA", "SILO", "SION", "SMMT", "SMTI", "SNDX", "SNGX", "SNTI", "SOPH", "SORA", "SPRB", "SPRX", "SPRY", "SPTX", "SRPT", "SRRK", "SRZN", "STOK", "STRO", "STTK", "SUSB", "SVRA", "SXTC", "SYRE", "TARA", "TARS", "TCRT", "TCRX", "TECH", "TECX", "TELO", "TENX", "TGTX", "THRD", "TIL", "TLSA", "TLSI", "TLX", "TNGX", "TNXP", "TNYA", "TPST", "TRAX", "TRDA", "TRVI", "TRXB", "TSHA", "TTRX", "TVGN", "TVRD", "TVTX", "TWST", "TXG", "TYRA", "UNCY", "UPB", "URGN", "VALN", "VANI", "VCEL", "VCRE", "VCYT", "VERA", "VERU", "VIGL", "VIR", "VKTX", "VNDA", "VOGX", "VOR", "VRAX", "VRCA", "VRDN", "VRXA", "VS", "VSTM", "VTGN", "VTVT", "VYGR", "WHWK", "WVE", "XBIO", "XBIT", "XCUR", "XENE", "XFOR", "XLO", "XNCR", "XRTX", "YARW", "YDES", "ZBIO", "ZGN", "ZLAB", "ZNTL", "ZURA", "ZVRA", "ZYBT", "ZYME"
-]
+# Sidebar controls for Alpaca API Credentials (pre-populated with your credentials)
+st.sidebar.header("Alpaca API Settings")
+alpaca_api_key = st.sidebar.text_input("Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password")
+alpaca_secret_key = st.sidebar.text_input("Alpaca Secret Key", value="3Lo3FMU1TdEbvYQzAZ5XMLFre7bmzd1Lp9fDJ6PJ2czx", type="password")
+alpaca_endpoint = st.sidebar.text_input("Alpaca Endpoint", value="https://paper-api.alpaca.markets/v2")
+use_paper = st.sidebar.checkbox("Use Paper Trading URL", value=True)
 
-# Sidebar controls
 st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
-    value=", ".join(DEFAULT_TICKERS),
-    height=250
+    value="AAPG, AARD, ABCL, ABEO, ABOS, ABSI, ABTS, ABUS, ABVC, ABVX, ACAD, ACET, ACHV, ACIU, ACLX, ACOG, ACRS, ACRV, ACTU, ADAG, ADMA, ADRX, ADUS, AEMD, AEON, AGEN, AGIO, AGMB, AKTS, AKTX, ALDX, ALEC, ALGS, ALKS, ALLO, ALLR, ALMS, ALNY, ALPS, ALT, ALVO, ALXO, ALZN, AMLX, ANAB, ANIX, ANL, ANNX, ANRO, ANTX, ANVS, APLM, APMD, APRE, APVO, ARCT, ARDX, ARGX, ARMP, ARQT, ARTV, ARVN, ARWR, ASBP, ASMB, ASND, ATHE, ATNM, ATOS, ATRA, ATTO, ATYR, AUPH, AURA, AUTL, AVBP, AVIR, AVLN, AVTX, AVXL, AXSM, AYTU, BBIO, BBLG, BBOT, BCAX, BCDA, BCRX, BCTX, BCYC, BDSX, BDTX, BEAM, BGMS, BHVN, BIIB, BIO, BIOA, BIOX, BJDX, BLRX, BLSM, BLTE, BMEA, BMRN, BNTC, BNTX, BOLD, BRTX, BRVE, BSEM, BYSI, CABA, CADL, CAI, CAMP, CAPR, CBIO, CBUS, CCCC, CDNA, CDXS, CELC, CELU, CELZ, CGEM, CGON, CGTX, CHRS, CING, CLDX, CLNN, CLPT, CLRB, CLRO, CLYM, CMPX, CNSP, CNSY, CNTB, CNTN, CNTX, CNXU, COAG, COCP, CODX, COGT, CORT, COYA, CRBP, CRBU, CRDF, CRIS, CRMD, CRSP, CRVO, CRVS, CSBR, CTKB, CTMX, CTNM, CTCTOR, CTXR, CUE, CUVL, CVKD, CVM, CYPH, CYRX, CYTK, DARE, DBVT, DFTX, DMAC, DMRA, DNA, DNLI, DNTH, DRTS, DRUG, DSGN, DSTX, DTIL, DWTX, DYAI, DYN, EBS, ECOR, EDIT, EDSA, EIKN, ELOX, ELTX, ELVN, ENGN, ENSC, ENTA, ENTX, EPRX, EQ, ERAS, ERNA, ESLA, ETRA, EVAX, EVMN, EWTX, EXEL, EXOZ, EYPT, FATE, FBIO, FDMT, FDTX, FEMY, FENC, FERA, FHTX, FLNA, FTH, FTRE, FULC, GALT, GANX, GENB, GERN, GHRS, GLSI, GLUE, GMAB, GNLX, GNPX, GOSS, GOVX, GPCR, GRCE, GRDX, GRI, GTBP, GUTS, GYRE, HALO, HBIO, HELP, HIND, HOWL, HRMY, HRTX, HUMA, HURA, HYBX, HYFT, HYPD, IBIO, IBO, IBRX, ICCC, ICU, IDYA, IFRX, IGC, IKT, IMA, IMCR, IMMP, IMMX, IMNM, IMRX, IMTX, IMUX, IMVT, INAB, INBX, INCY, INDP, INKT, INMB, INO, INSM, INTS, INVA, IONS, IOVA, IPHA, IPSC, IRD, IRON, IVA, IVVD, JAGX, JANX, JAZZ, JBIO, JSPR, KARD, KLRA, KLRS, KNSA, KOD, KPRX, KPTI, KROS, KRRO, KRSA, KRYS, KTTA, KURA, KYMR, KYNB, KYTX, KZIA, LBRX, LCTX, LEGN, LENZ, LGND, LGVN, LIMN, LIQT, LITS, LKFT, LNAI, LONA, LPCN, LQDA, LRMR, LTGO, LTRN, LUNG, LXEO, LXRX, LYEL, MAIA, MANE, MAZE, MBIO, MBX, MCRB, MDGL, MDWD, MDXG, MENS, MESO, MGNX, MGRX, MGX, MIRM, MIST, MLYS, MNKD, MNOV, MNPR, MOLN, MREO, MRNA, MRVI, MSLE, MYCN, MYGN, NAMS, NAUT, NBIS, NBIX, NBP, NBTX, NCEL, NCNA, NERV, NEUP, NGEN, NGNE, NKTR, NKTX, NMRA, NNVC, NRIX, NRXP, NRXS, NTHI, NTLA, NTRB, NTRP, NUVB, NVCT, NXTC, OABI, OBIO, OBX, OCGN, OCS, OCUL, ODTX, OKUR, OKYO, OLMA, OMER, ONC, ONCO, ONCY, OPAL, ORGO, ORIC, ORKA, ORMP, OSTX, OTLK, OXBR, PACB, PALI, PBLS, PBYI, PCVX, PDSB, PEPG, PGEN, PHAR, PHAT, PHIO, PHVS, PLRX, PLUR, PLX, PLYX, PMN, PMVP, PRAX, PRFX, PRLD, PRME, PROK, PRQR, PRTA, PTCT, PTGX, PTHS, PTN, PULM, PURR, PVLA, PYPD, PYXS, QCLR, QDEL, QGEN, QNRX, QNTM, QTRX, QTTB, QURE, RADX, RANI, RAPP, RARE, RCEL, RCKT, RCUS, REGN, REPL, REVB, RGEN, RGNX, RGTX, RIGL, RKDA, RLAY, RLMD, RLYB, RNA, RNAC, RNAZ, RNTX, RNXT, ROIV, RPID, RPRX, RTSN, RVMD, RXRX, RYTM, SABS, SANA, SBFM, SCTX, SCYX, SEER, SEPN, SER, SERA, SGMT, SGP, SHPH, SIGA, SILO, SION, SMMT, SMTI, SNDX, SNGX, SNTI, SOPH, SORA, SPRB, SPRX, SPRY, SPTX, SRPT, SRRK, SRZN, STOK, STRO, STTK, SUSB, SVRA, SXTC, SYRE, TARA, TARS, TCRT, TCRX, TECH, TECX, TELO, TENX, TGTX, THRD, TIL, TLSA, TLSI, TLX, TNGX, TNXP, TNYA, TPST, TRAX, TRDA, TRVI, TRXB, TSHA, TTRX, TVGN, TVRD, TVTX, TWST, TXG, TYRA, UNCY, UPB, URGN, VALN, VANI, VCEL, VCRE, VCYT, VERA, VERU, VIGL, VIR, VKTX, VNDA, VOGX, VOR, VRAX, VRCA, VRDN, VRXA, VS, VSTM, VTGN, VTVT, VYGR, WHWK, WVE, XBIO, XBIT, XCUR, XENE, XFOR, XLO, XNCR, XRTX, YARW, YDES, ZBIO, ZGN, ZLAB, ZNTL, ZURA, ZVRA, ZYBT, ZYME",
+    height=150
 )
 
 # Parse tickers
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-tickers = list(dict.fromkeys(tickers)) # remove duplicates
+tickers = list(dict.fromkeys(tickers))
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
-
-# Touch-friendly toggle switch (5 min refresh)
-auto_refresh = st.sidebar.toggle("🔄 Enable 5 min Auto-Refresh", value=False, help="Automatically re-runs the screener every 5 minutes")
-
-# Refresh Data button
-refresh_btn = st.sidebar.button("🔄 Refresh Data Now", help="Clears cache and fetches fresh live data immediately")
+auto_refresh = st.sidebar.toggle("🔄 Enable 5 min Auto-Refresh", value=False)
+refresh_btn = st.sidebar.button("🔄 Refresh Data Now")
 
 if refresh_btn:
     st.cache_data.clear()
@@ -46,17 +44,83 @@ if refresh_btn:
         del st.session_state["df_results"]
     st.rerun()
 
-# Maintain execution state
 if run_scan:
     st.session_state["is_running"] = True
 
+
+def is_premarket_hours():
+    """Checks if current time in Eastern Time is within US premarket hours (4:00 AM - 9:30 AM ET, Mon-Fri)."""
+    et_tz = pytz.timezone("US/Eastern")
+    now_et = datetime.now(et_tz)
+    
+    if now_et.weekday() >= 5:
+        return False
+        
+    current_time = now_et.time()
+    premarket_start = dtime(4, 0)
+    market_open = dtime(9, 30)
+    
+    return premarket_start <= current_time < market_open
+
+
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_screener_data(ticker_list):
+def fetch_screener_data_alpaca(ticker_list, api_key, secret_key, base_url):
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockBarsRequest
+    from alpaca.data.timeframe import TimeFrame
+    from alpaca.data.enums import DataFeed
+    
+    price_data = {}
+    failed_tickers = []
+    
+    try:
+        # Pass base URL and credentials explicitly
+        client = StockHistoricalDataClient(api_key, secret_key)
+        
+        batch_size = 50
+        for i in range(0, len(ticker_list), batch_size):
+            batch = ticker_list[i:i + batch_size]
+            try:
+                request_params = StockBarsRequest(
+                    symbol_or_symbols=batch,
+                    timeframe=TimeFrame.Minute,
+                    limit=2,
+                    feed=DataFeed.IEX 
+                )
+                bars = client.get_stock_bars(request_params)
+                
+                for ticker in batch:
+                    try:
+                        symbol_bars = bars[ticker]
+                        if not symbol_bars:
+                            failed_tickers.append((ticker, "No premarket data returned from Alpaca"))
+                            continue
+                        
+                        prices = pd.Series([bar.close for bar in symbol_bars])
+                        if len(prices) < 2:
+                            failed_tickers.append((ticker, "Insufficient premarket history"))
+                            continue
+                        
+                        price_data[ticker] = prices
+                    except Exception as e:
+                        failed_tickers.append((ticker, f"Alpaca error: {type(e).__name__}"))
+            except Exception as e:
+                for ticker in batch:
+                    failed_tickers.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
+                    
+    except Exception as e:
+        for ticker in ticker_list:
+            failed_tickers.append((ticker, f"Alpaca Client Init Error: {str(e)}"))
+            
+    return price_data, failed_tickers
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_screener_data_yfinance(ticker_list):
     import yfinance as yf
     price_data = {}
     failed_tickers = []
     
-    # Process in optimized batches of 50 to prevent memory spikes and timeouts
     batch_size = 50
     for i in range(0, len(ticker_list), batch_size):
         batch = ticker_list[i:i + batch_size]
@@ -100,9 +164,23 @@ def fetch_screener_data(ticker_list):
             
     return price_data, failed_tickers
 
+
 if st.session_state.get("is_running", False):
-    with st.spinner("Fetching live market data..."):
-        price_data, failed_tickers = fetch_screener_data(tickers)
+    in_premarket = is_premarket_hours()
+    
+    if in_premarket:
+        st.info("⏰ Market is currently in **Pre-Market hours**. Attempting to fetch data via **Alpaca**...")
+        if not alpaca_api_key or not alpaca_secret_key:
+            st.warning("⚠️ Alpaca API Keys missing in sidebar! Falling back to Yahoo Finance.")
+            price_data, failed_tickers = fetch_screener_data_yfinance(tickers)
+        else:
+            price_data, failed_tickers = fetch_screener_data_alpaca(tickers, alpaca_api_key, alpaca_secret_key, alpaca_endpoint)
+            if not price_data:
+                st.warning("⚠️ Alpaca returned no records. Falling back to Yahoo Finance.")
+                price_data, failed_tickers = fetch_screener_data_yfinance(tickers)
+    else:
+        st.info("🏛️ Market is in **Regular/Closed hours**. Fetching standard data via **Yahoo Finance**...")
+        price_data, failed_tickers = fetch_screener_data_yfinance(tickers)
 
     results = []
     for ticker in tickers:
@@ -306,7 +384,6 @@ if st.session_state.get("is_running", False):
             st.pyplot(fig)
             plt.close(fig)
 
-    # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
     if auto_refresh:
         st.info("⏳ Auto-refreshing in 5 minutes...")
         time.sleep(300)
