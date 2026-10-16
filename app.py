@@ -1,5 +1,5 @@
+Use Market Data App SDK instead of alpaca to access premarket data if premarket hours are on mixed with yfinance premarket bu only if the SDK fails to get a ticker data, and use same hybride plan in the regular market session.. and keep all messages anf titles intact.. here's the script: import time
 from datetime import datetime
-import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -16,10 +16,15 @@ st.markdown(
     " visualizes market sentiment."
 )
 
-# Sidebar controls for Market Data API Credentials
-st.sidebar.header("Market Data API Settings")
-marketdata_api_key = st.sidebar.text_input(
-    "Market Data API Key", value="", type="password"
+# Sidebar controls for Alpaca API Credentials
+st.sidebar.header("Alpaca API Settings")
+alpaca_api_key = st.sidebar.text_input(
+    "Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password"
+)
+alpaca_secret_key = st.sidebar.text_input(
+    "Alpaca Secret Key",
+    value="3Lo3FMU1TdEbvYQzAZ5XMLFre7bmzd1Lp9fDJ6PJ2czx",
+    type="password",
 )
 
 # Expanded Ticker List
@@ -655,67 +660,75 @@ if run_scan:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_marketdata_fallback(missing_tickers, api_key):
-  """Fulfills missing regular or premarket session data via Market Data App SDK."""
-  import marketdata
+def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
+  """Completions missing regular session data via Alpaca Snapshots."""
+  from alpaca.data.enums import DataFeed
+  from alpaca.data.historical import StockHistoricalDataClient
+  from alpaca.data.requests import StockSnapshotRequest
 
-  marketdata_data = {}
+  alpaca_data = {}
   failed_list = []
 
-  if not missing_tickers or not api_key:
-    return marketdata_data, missing_tickers
+  if not missing_tickers or not api_key or not secret_key:
+    return alpaca_data, missing_tickers
 
   try:
-    client = marketdata.Client(api_key=api_key)
+    client = StockHistoricalDataClient(api_key, secret_key)
     batch_size = 50
 
     for i in range(0, len(missing_tickers), batch_size):
       batch = missing_tickers[i : i + batch_size]
       try:
-        # Fetching quotes/candles using Market Data App SDK
+        request_params = StockSnapshotRequest(
+            symbol_or_symbols=batch, feed=DataFeed.IEX
+        )
+        snapshots = client.get_stock_snapshot(request_params)
+
         for ticker in batch:
-          try:
-            quote = client.stocks.get_stock_quotes(symbol=ticker)
-            if quote and "last" in quote and "prevClose" in quote:
-              prev_close = float(quote["prevClose"])
-              latest_price = float(quote["last"])
-              if prev_close and latest_price:
-                marketdata_data[ticker] = pd.Series([prev_close, latest_price])
-              else:
-                failed_list.append(
-                    (ticker, "Incomplete Market Data SDK price")
-                )
-            else:
-              failed_list.append(
-                  (ticker, "No quote data returned from Market Data SDK")
-              )
-          except Exception as e:
-            failed_list.append(
-                (ticker, f"Market Data SDK error: {type(e).__name__}")
+          if ticker in snapshots and snapshots[ticker]:
+            snap = snapshots[ticker]
+            prev_close = (
+                snap.previous_daily_bar.close
+                if snap.previous_daily_bar
+                else None
             )
+            latest_price = (
+                snap.latest_trade.price
+                if snap.latest_trade
+                else (
+                    snap.daily_bar.close
+                    if snap.daily_bar
+                    else (
+                        snap.minute_bar.close if snap.minute_bar else None
+                    )
+                )
+            )
+
+            if prev_close and latest_price:
+              alpaca_data[ticker] = pd.Series([prev_close, latest_price])
+            else:
+              failed_list.append((ticker, "Incomplete Alpaca snapshot price"))
+          else:
+            failed_list.append((ticker, "No snapshot data on Alpaca"))
       except Exception as e:
         for ticker in batch:
-          failed_list.append(
-              (ticker, f"Market Data batch error: {type(e).__name__}")
-          )
+          failed_list.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
   except Exception as e:
     for ticker in missing_tickers:
-      failed_list.append(
-          (ticker, f"Market Data SDK init error: {type(e).__name__}")
-      )
+      failed_list.append((ticker, f"Alpaca init error: {type(e).__name__}"))
 
-  return marketdata_data, failed_list
+  return alpaca_data, failed_list
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_screener_data(ticker_list, api_key):
+def fetch_screener_data(ticker_list, api_key, secret_key):
   import yfinance as yf
 
   price_data = {}
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance (incorporates premarket/regular session based on yfinance parameters)
+  # Step 1: Process in optimized batches of 50 via yfinance (Regular session data)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
@@ -724,7 +737,6 @@ def fetch_screener_data(ticker_list, api_key):
           batch,
           period="5d",
           interval="1d",
-          prepost=True,  # Includes pre-market and post-market hours mixed in
           auto_adjust=False,
           group_by="ticker",
           threads=True,
@@ -757,13 +769,13 @@ def fetch_screener_data(ticker_list, api_key):
     except Exception:
       missing_tickers.extend(batch)
 
-  # Step 2: Use Market Data App SDK to fulfill missing yfinance data (Hybrid fallback plan)
+  # Step 2: Use Alpaca API to fulfill missing yfinance data
   if missing_tickers:
-    marketdata_fallback_data, marketdata_failed = fetch_marketdata_fallback(
-        missing_tickers, api_key
+    alpaca_data, alpaca_failed = fetch_alpaca_fallback(
+        missing_tickers, api_key, secret_key
     )
-    price_data.update(marketdata_fallback_data)
-    failed_tickers.extend(marketdata_failed)
+    price_data.update(alpaca_data)
+    failed_tickers.extend(alpaca_failed)
 
   return price_data, failed_tickers
 
@@ -771,7 +783,7 @@ def fetch_screener_data(ticker_list, api_key):
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
-        tickers, marketdata_api_key
+        tickers, alpaca_api_key, alpaca_secret_key
     )
 
   results = []
