@@ -781,20 +781,38 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_squeeze_metrics(ticker_list):
-  """Multithreaded fetching of Float, Short Interest, and Short Ratio from yfinance."""
+  """Robust multithreaded fetcher for Float and Short Data with fast_info fallbacks."""
   import yfinance as yf
 
   def get_single_info(ticker):
     try:
-      info = yf.Ticker(ticker).info
-      float_shares = info.get("floatShares") or info.get("sharesOutstanding")
-      short_pct = info.get("shortPercentOfFloat")
-      short_ratio = info.get("shortRatio")
+      tk = yf.Ticker(ticker)
 
-      short_pct_val = (short_pct * 100) if short_pct is not None else None
-      float_m_val = (
-          (float_shares / 1_000_000) if float_shares is not None else None
-      )
+      info = {}
+      try:
+        info = tk.info or {}
+      except Exception:
+        pass
+
+      shares_out = info.get("floatShares") or info.get("sharesOutstanding")
+      if not shares_out:
+        try:
+          if hasattr(tk, "fast_info") and "shares" in tk.fast_info:
+            shares_out = tk.fast_info["shares"]
+        except Exception:
+          pass
+
+      float_m_val = (shares_out / 1_000_000) if shares_out is not None else None
+
+      short_pct = info.get("shortPercentOfFloat")
+      if short_pct is not None:
+        short_pct_val = (
+            short_pct * 100 if short_pct < 2.0 else short_pct
+        )  # Handle decimal vs percentage formatting
+      else:
+        short_pct_val = None
+
+      short_ratio = info.get("shortRatio")
 
       return ticker, {
           "Float (M)": float_m_val,
@@ -867,7 +885,6 @@ if st.session_state.get("is_running", False):
     change = latest_close - previous_close
     pct_change = (change / previous_close) * 100
 
-    # Retreive Float & Squeeze Metrics
     sq_info = squeeze_data.get(
         ticker,
         {"Float (M)": None, "Short Int (%)": None, "Short Ratio": None},
@@ -876,18 +893,16 @@ if st.session_state.get("is_running", False):
     short_pct = sq_info["Short Int (%)"]
     short_ratio = sq_info["Short Ratio"]
 
-    # Structural Rules Evaluation
     is_low_float = float_m is not None and float_m <= 20.0
     is_high_short = short_pct is not None and short_pct >= 15.0
 
-    # Calculate Custom Squeeze Score (0 to 100)
     squeeze_score = 0
     if pct_change >= 15.0:
-      squeeze_score += 40  # Momentum Trigger
+      squeeze_score += 40
     if is_low_float:
-      squeeze_score += 30  # Choked Supply
+      squeeze_score += 30
     if is_high_short:
-      squeeze_score += 30  # Trapped Shorts
+      squeeze_score += 30
 
     results.append({
         "Ticker": ticker,
@@ -906,7 +921,6 @@ if st.session_state.get("is_running", False):
 
   df = pd.DataFrame(results)
 
-  # Sort primarily by Squeeze Score, then by Daily Change
   df = df.sort_values(
       by=["Squeeze Score", "Daily Change (%)"],
       ascending=[False, False],
@@ -920,7 +934,6 @@ if st.session_state.get("is_running", False):
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
 
-  # Key Metrics Summary
   valid = df[df["Status"] == "OK"]
   col1, col2, col3, col4 = st.columns(4)
   col1.metric("Total Scanned", len(tickers))
@@ -939,10 +952,8 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-  # Enhanced Data Frame Table Display
   st.subheader("📋 Stock Performance & Short Squeeze Screener")
 
-  # Highlight formatting for Squeeze Flags
   def style_flags(val):
     if val == "⚡ YES":
       return "background-color: #d3f9d8; color: #2b8a3e; font-weight: bold;"
@@ -967,7 +978,6 @@ if st.session_state.get("is_running", False):
       use_container_width=True,
   )
 
-  # CSV Download
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
   csv = df.to_csv(index=False).encode("utf-8")
   st.download_button(
@@ -977,9 +987,6 @@ if st.session_state.get("is_running", False):
       mime="text/csv",
   )
 
-  # ---------------------------------------------------------------------------
-  # RENDER 4-PANEL SENTIMENT DASHBOARD GRAPHS
-  # ---------------------------------------------------------------------------
   st.markdown("---")
   st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
 
