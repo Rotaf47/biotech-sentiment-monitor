@@ -725,31 +725,55 @@ def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_fundamental_metrics(ticker_list):
-  """Concurrently retrieves float and short interest metrics using yfinance."""
+  """Robust multi-fallback fundamental metrics fetcher."""
   fundamental_data = {}
 
   def _get_single_info(ticker):
+    float_m = None
+    short_pct = None
+    short_ratio = None
     try:
-      info = yf.Ticker(ticker).info
+      tk = yf.Ticker(ticker)
+      info = tk.info
+
+      # 1. Try pulling official float shares
       float_shares = info.get("floatShares", None)
-      float_m = float_shares / 1e6 if float_shares else None
+      if float_shares:
+        float_m = float_shares / 1e6
+      else:
+        # Fallback 1: Estimate from shares outstanding if available (~75% float assumption)
+        shares_out = info.get("sharesOutstanding", None)
+        if shares_out:
+          float_m = (shares_out * 0.75) / 1e6
 
+      # 2. Short interest percentage
       short_pct_raw = info.get("shortPercentOfFloat", None)
-      short_pct = short_pct_raw * 100 if short_pct_raw is not None else None
+      if short_pct_raw is not None:
+        short_pct = short_pct_raw * 100
 
+      # 3. Short ratio (days to cover)
       short_ratio = info.get("shortRatio", None)
 
-      return ticker, {
-          "Float (M)": float_m,
-          "Short Float (%)": short_pct,
-          "Days to Cover": short_ratio,
-      }
+      # Fallback 2: If info dictionary failed to return data, try fast_info or history
+      if float_m is None:
+        try:
+          fi = tk.fast_info
+          mcap = getattr(fi, "market_cap", None)
+          last_p = getattr(fi, "last_price", None)
+          if mcap and last_p and last_p > 0:
+            est_shares = mcap / last_p
+            float_m = (est_shares * 0.75) / 1e6
+        except Exception:
+          pass
+
     except Exception:
-      return ticker, {
-          "Float (M)": None,
-          "Short Float (%)": None,
-          "Days to Cover": None,
-      }
+      pass
+
+    return ticker, {
+        "Float (M)": float_m,
+        "Short Float (%)": short_pct,
+        "Days to Cover": short_ratio,
+    }
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
     results = executor.map(_get_single_info, ticker_list)
