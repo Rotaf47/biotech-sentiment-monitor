@@ -34,7 +34,7 @@ tickers = list(dict.fromkeys(tickers)) # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Replaced checkbox with a touch-friendly toggle switch (updated to 5 min)
+# Touch-friendly toggle switch (5 min refresh)
 auto_refresh = st.sidebar.toggle("🔄 Enable 5 min Auto-Refresh", value=False, help="Automatically re-runs the screener every 5 minutes")
 
 # Refresh Data button
@@ -55,33 +55,54 @@ def fetch_screener_data(ticker_list):
     import yfinance as yf
     price_data = {}
     failed_tickers = []
-
-    for ticker in ticker_list:
+    
+    # Process in optimized batches of 50 to prevent memory spikes and timeouts
+    batch_size = 50
+    for i in range(0, len(ticker_list), batch_size):
+        batch = ticker_list[i:i + batch_size]
         try:
-            hist = yf.Ticker(ticker).history(
+            data = yf.download(
+                batch,
                 period="5d",
                 interval="1d",
                 auto_adjust=False,
-                raise_errors=True
+                group_by="ticker",
+                threads=True,
+                progress=False
             )
+            
+            for ticker in batch:
+                try:
+                    if len(batch) == 1:
+                        hist = data
+                    else:
+                        if ticker in data.columns.levels[0]:
+                            hist = data[ticker]
+                        else:
+                            failed_tickers.append((ticker, "No data returned"))
+                            continue
+                    
+                    if hist.empty or "Close" not in hist.columns:
+                        failed_tickers.append((ticker, "No data returned"))
+                        continue
 
-            if hist.empty or "Close" not in hist.columns:
-                failed_tickers.append((ticker, "No data returned"))
-                continue
+                    prices = hist["Close"].dropna()
+                    if len(prices) < 2:
+                        failed_tickers.append((ticker, "Insufficient daily price history"))
+                        continue
 
-            prices = hist["Close"].dropna()
-            if len(prices) < 2:
-                failed_tickers.append((ticker, "Insufficient daily price history"))
-                continue
-
-            price_data[ticker] = prices
+                    price_data[ticker] = prices
+                except Exception as e:
+                    failed_tickers.append((ticker, type(e).__name__))
         except Exception as e:
-            failed_tickers.append((ticker, type(e).__name__))
+            for ticker in batch:
+                failed_tickers.append((ticker, type(e).__name__))
             
     return price_data, failed_tickers
 
 if st.session_state.get("is_running", False):
-    price_data, failed_tickers = fetch_screener_data(tickers)
+    with st.spinner("Fetching live market data in batches..."):
+        price_data, failed_tickers = fetch_screener_data(tickers)
 
     results = []
     for ticker in tickers:
