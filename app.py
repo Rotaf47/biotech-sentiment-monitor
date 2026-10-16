@@ -1,12 +1,9 @@
-import concurrent.futures
-from datetime import datetime
 import time
-
+from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
-import yfinance as yf
 
 # Page Configuration
 st.set_page_config(
@@ -724,67 +721,9 @@ def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_fundamental_metrics(ticker_list):
-  """Robust multi-fallback fundamental metrics fetcher."""
-  fundamental_data = {}
-
-  def _get_single_info(ticker):
-    float_m = None
-    short_pct = None
-    short_ratio = None
-    try:
-      tk = yf.Ticker(ticker)
-      info = tk.info
-
-      # 1. Try pulling official float shares
-      float_shares = info.get("floatShares", None)
-      if float_shares:
-        float_m = float_shares / 1e6
-      else:
-        # Fallback 1: Estimate from shares outstanding if available (~75% float assumption)
-        shares_out = info.get("sharesOutstanding", None)
-        if shares_out:
-          float_m = (shares_out * 0.75) / 1e6
-
-      # 2. Short interest percentage
-      short_pct_raw = info.get("shortPercentOfFloat", None)
-      if short_pct_raw is not None:
-        short_pct = short_pct_raw * 100
-
-      # 3. Short ratio (days to cover)
-      short_ratio = info.get("shortRatio", None)
-
-      # Fallback 2: If info dictionary failed to return data, try fast_info or history
-      if float_m is None:
-        try:
-          fi = tk.fast_info
-          mcap = getattr(fi, "market_cap", None)
-          last_p = getattr(fi, "last_price", None)
-          if mcap and last_p and last_p > 0:
-            est_shares = mcap / last_p
-            float_m = (est_shares * 0.75) / 1e6
-        except Exception:
-          pass
-
-    except Exception:
-      pass
-
-    return ticker, {
-        "Float (M)": float_m,
-        "Short Float (%)": short_pct,
-        "Days to Cover": short_ratio,
-    }
-
-  with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-    results = executor.map(_get_single_info, ticker_list)
-    for ticker, res in results:
-      fundamental_data[ticker] = res
-
-  return fundamental_data
-
-
-@st.cache_data(ttl=300, show_spinner=False)
 def fetch_screener_data(ticker_list, api_key, secret_key):
+  import yfinance as yf
+
   price_data = {}
   failed_tickers = []
   missing_tickers = []
@@ -838,38 +777,17 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
     price_data.update(alpaca_data)
     failed_tickers.extend(alpaca_failed)
 
-  # Step 3: Fetch short interest & float fundamental metrics
-  fundamentals = fetch_fundamental_metrics(ticker_list)
-
-  return price_data, failed_tickers, fundamentals
+  return price_data, failed_tickers
 
 
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
-    price_data, failed_tickers, fundamentals = fetch_screener_data(
+    price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
 
   results = []
   for ticker in tickers:
-    f_metrics = fundamentals.get(
-        ticker,
-        {"Float (M)": None, "Short Float (%)": None, "Days to Cover": None},
-    )
-    f_m = f_metrics.get("Float (M)", None)
-    s_f = f_metrics.get("Short Float (%)", None)
-
-    # Calculate Squeeze Rating
-    if f_m is not None and s_f is not None:
-      if f_m < 20 and s_f >= 15:
-        squeeze_rating = "🔥🔥 HIGH"
-      elif f_m < 50 and s_f >= 10:
-        squeeze_rating = "🔥 MED"
-      else:
-        squeeze_rating = "LOW"
-    else:
-      squeeze_rating = "N/A"
-
     if ticker not in price_data:
       results.append({
           "Ticker": ticker,
@@ -877,10 +795,6 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": None,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "Float (M)": f_m,
-          "Short Float (%)": s_f,
-          "Days to Cover": f_metrics.get("Days to Cover", None),
-          "Squeeze Rating": squeeze_rating,
           "Status": "No data / insufficient history",
       })
       continue
@@ -896,10 +810,6 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "Float (M)": f_m,
-          "Short Float (%)": s_f,
-          "Days to Cover": f_metrics.get("Days to Cover", None),
-          "Squeeze Rating": squeeze_rating,
           "Status": "Invalid previous close",
       })
       continue
@@ -913,10 +823,6 @@ if st.session_state.get("is_running", False):
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
-        "Float (M)": f_m,
-        "Short Float (%)": s_f,
-        "Days to Cover": f_metrics.get("Days to Cover", None),
-        "Squeeze Rating": squeeze_rating,
         "Status": "OK",
     })
 
@@ -957,9 +863,6 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
-              "Float (M)": "{:.2f}",
-              "Short Float (%)": "{:.2f}%",
-              "Days to Cover": "{:.2f}",
           },
           na_rep="N/A",
       ),
@@ -1001,31 +904,10 @@ if st.session_state.get("is_running", False):
       median_return = float(returns.median())
       mean_return = float(returns.mean())
 
-      # Squeeze Score Calculation
-      high_squeeze_cnt = int(
-          (clean_df["Squeeze Rating"] == "🔥🔥 HIGH").sum()
-      )
-      med_squeeze_cnt = int((clean_df["Squeeze Rating"] == "🔥 MED").sum())
-      squeeze_score = float(
-          np.clip(
-              ((high_squeeze_cnt * 2 + med_squeeze_cnt) / max(1, total))
-              * 100
-              * 3,
-              -100,
-              100,
-          )
-      )
-
       breadth_score = advance_pct - decline_pct
       return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
-
-      # Enhanced 3-Factor Composite Sentiment Score
       score = float(
-          np.clip(
-              0.50 * breadth_score + 0.30 * return_score + 0.20 * squeeze_score,
-              -100,
-              100,
-          )
+          np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100)
       )
 
       if score <= -60:
