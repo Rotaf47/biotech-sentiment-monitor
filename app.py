@@ -7,12 +7,12 @@ import time
 
 # Page Configuration
 st.set_page_config(
-    page_title="BMS",
+    page_title="Biotech Sentiment Monitor",
     page_icon="📈",
     layout="wide"
 )
 
-st.title("🧬 Biotech Sentiment Monitor")
+st.title("🧬 BSM")
 st.markdown("Scans live biotech tickers via Yahoo Finance, ranks daily performance, and visualizes market sentiment.")
 
 # Expanded Ticker List
