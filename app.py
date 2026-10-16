@@ -1,4 +1,4 @@
-Use Market Data App SDK instead of alpaca to access premarket data if premarket hours are on mixed with yfinance premarket bu only if the SDK fails to get a ticker data, and use same hybride plan in the regular market session.. and keep all messages anf titles intact.. here's the script: import time
+import time
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
