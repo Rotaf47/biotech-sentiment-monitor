@@ -1,6 +1,7 @@
-import time
-from datetime import datetime
 import concurrent.futures
+from datetime import datetime
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,12 +10,13 @@ import yfinance as yf
 
 # Page Configuration
 st.set_page_config(
-    page_title="Biotech Sentiment & Squeeze Monitor", page_icon="🧬", layout="wide"
+    page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-st.title("🧬 BSM — Biotech Sentiment & Squeeze Monitor")
+st.title("🧬 BSM")
 st.markdown(
-    "Scans live biotech tickers, tracks premarket gaps, monitors float/short squeeze mechanics, and visualizes market sentiment."
+    "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
+    " visualizes market sentiment."
 )
 
 # Sidebar controls for Alpaca API Credentials
@@ -28,7 +30,7 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Original 590 Ticker List (Exact Original Order)
+# Expanded Ticker List
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -630,18 +632,20 @@ tickers_input = st.sidebar.text_area(
     height=250,
 )
 
-# Parse tickers while preserving order (using dict.fromkeys)
+# Parse tickers
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-tickers = list(dict.fromkeys(tickers))
+tickers = list(dict.fromkeys(tickers))  # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
+# Touch-friendly toggle switch (5 min refresh)
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 5 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 5 minutes",
 )
 
+# Refresh Data button
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
@@ -653,52 +657,9 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
+# Maintain execution state
 if run_scan:
   st.session_state["is_running"] = True
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_fundamental_metrics(ticker_list):
-  """Fetches float, short percent of float, and short ratio via yfinance info."""
-  fundamentals = {}
-
-  def get_info(symbol):
-    try:
-      info = yf.Ticker(symbol).info
-      float_shares = info.get("floatShares", None)
-      short_pct = info.get("shortPercentOfFloat", None)
-      short_ratio = info.get("shortRatio", None)
-
-      short_pct_formatted = short_pct * 100 if short_pct is not None else None
-      float_in_millions = float_shares / 1e6 if float_shares is not None else None
-
-      squeeze_rating = "LOW"
-      if float_in_millions is not None and short_pct_formatted is not None:
-        if float_in_millions <= 15.0 and short_pct_formatted >= 15.0:
-          squeeze_rating = "🔥🔥 HIGH"
-        elif float_in_millions <= 30.0 and short_pct_formatted >= 10.0:
-          squeeze_rating = "🔥 MED"
-
-      return symbol, {
-          "Float (M)": float_in_millions,
-          "Short Float (%)": short_pct_formatted,
-          "Days to Cover": short_ratio,
-          "Squeeze Rating": squeeze_rating,
-      }
-    except Exception:
-      return symbol, {
-          "Float (M)": None,
-          "Short Float (%)": None,
-          "Days to Cover": None,
-          "Squeeze Rating": "N/A",
-      }
-
-  with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-    results = executor.map(get_info, ticker_list)
-    for symbol, data in results:
-      fundamentals[symbol] = data
-
-  return fundamentals
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -763,11 +724,48 @@ def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def fetch_fundamental_metrics(ticker_list):
+  """Concurrently retrieves float and short interest metrics using yfinance."""
+  fundamental_data = {}
+
+  def _get_single_info(ticker):
+    try:
+      info = yf.Ticker(ticker).info
+      float_shares = info.get("floatShares", None)
+      float_m = float_shares / 1e6 if float_shares else None
+
+      short_pct_raw = info.get("shortPercentOfFloat", None)
+      short_pct = short_pct_raw * 100 if short_pct_raw is not None else None
+
+      short_ratio = info.get("shortRatio", None)
+
+      return ticker, {
+          "Float (M)": float_m,
+          "Short Float (%)": short_pct,
+          "Days to Cover": short_ratio,
+      }
+    except Exception:
+      return ticker, {
+          "Float (M)": None,
+          "Short Float (%)": None,
+          "Days to Cover": None,
+      }
+
+  with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+    results = executor.map(_get_single_info, ticker_list)
+    for ticker, res in results:
+      fundamental_data[ticker] = res
+
+  return fundamental_data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_screener_data(ticker_list, api_key, secret_key):
   price_data = {}
   failed_tickers = []
   missing_tickers = []
 
+  # Step 1: Process in optimized batches of 50 via yfinance (Regular session data)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
@@ -784,12 +782,16 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
       for ticker in batch:
         try:
-          hist = (
-              data
-              if len(batch) == 1
-              else (data[ticker] if ticker in data.columns.levels[0] else None)
-          )
-          if hist is None or hist.empty or "Close" not in hist.columns:
+          if len(batch) == 1:
+            hist = data
+          else:
+            if ticker in data.columns.levels[0]:
+              hist = data[ticker]
+            else:
+              missing_tickers.append(ticker)
+              continue
+
+          if hist.empty or "Close" not in hist.columns:
             missing_tickers.append(ticker)
             continue
 
@@ -804,6 +806,7 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
     except Exception:
       missing_tickers.extend(batch)
 
+  # Step 2: Use Alpaca API to fulfill missing yfinance data
   if missing_tickers:
     alpaca_data, alpaca_failed = fetch_alpaca_fallback(
         missing_tickers, api_key, secret_key
@@ -811,19 +814,37 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
     price_data.update(alpaca_data)
     failed_tickers.extend(alpaca_failed)
 
-  return price_data, failed_tickers
+  # Step 3: Fetch short interest & float fundamental metrics
+  fundamentals = fetch_fundamental_metrics(ticker_list)
+
+  return price_data, failed_tickers, fundamentals
 
 
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching market price data and short float mechanics..."):
-    price_data, failed_tickers = fetch_screener_data(
+  with st.spinner("Fetching live market data..."):
+    price_data, failed_tickers, fundamentals = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
-    fundamentals = fetch_fundamental_metrics(tickers)
 
   results = []
   for ticker in tickers:
-    fund = fundamentals.get(ticker, {})
+    f_metrics = fundamentals.get(
+        ticker,
+        {"Float (M)": None, "Short Float (%)": None, "Days to Cover": None},
+    )
+    f_m = f_metrics.get("Float (M)", None)
+    s_f = f_metrics.get("Short Float (%)", None)
+
+    # Calculate Squeeze Rating
+    if f_m is not None and s_f is not None:
+      if f_m < 20 and s_f >= 15:
+        squeeze_rating = "🔥🔥 HIGH"
+      elif f_m < 50 and s_f >= 10:
+        squeeze_rating = "🔥 MED"
+      else:
+        squeeze_rating = "LOW"
+    else:
+      squeeze_rating = "N/A"
 
     if ticker not in price_data:
       results.append({
@@ -832,10 +853,10 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": None,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "Float (M)": fund.get("Float (M)"),
-          "Short Float (%)": fund.get("Short Float (%)"),
-          "Days to Cover": fund.get("Days to Cover"),
-          "Squeeze Rating": fund.get("Squeeze Rating", "N/A"),
+          "Float (M)": f_m,
+          "Short Float (%)": s_f,
+          "Days to Cover": f_metrics.get("Days to Cover", None),
+          "Squeeze Rating": squeeze_rating,
           "Status": "No data / insufficient history",
       })
       continue
@@ -851,10 +872,10 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "Float (M)": fund.get("Float (M)"),
-          "Short Float (%)": fund.get("Short Float (%)"),
-          "Days to Cover": fund.get("Days to Cover"),
-          "Squeeze Rating": fund.get("Squeeze Rating", "N/A"),
+          "Float (M)": f_m,
+          "Short Float (%)": s_f,
+          "Days to Cover": f_metrics.get("Days to Cover", None),
+          "Squeeze Rating": squeeze_rating,
           "Status": "Invalid previous close",
       })
       continue
@@ -868,10 +889,10 @@ if st.session_state.get("is_running", False):
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
-        "Float (M)": fund.get("Float (M)"),
-        "Short Float (%)": fund.get("Short Float (%)"),
-        "Days to Cover": fund.get("Days to Cover"),
-        "Squeeze Rating": fund.get("Squeeze Rating", "N/A"),
+        "Float (M)": f_m,
+        "Short Float (%)": s_f,
+        "Days to Cover": f_metrics.get("Days to Cover", None),
+        "Squeeze Rating": squeeze_rating,
         "Status": "OK",
     })
 
@@ -887,25 +908,24 @@ if st.session_state.get("is_running", False):
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
 
+  # Metrics summary
   valid = df[df["Status"] == "OK"]
-  col1, col2, col3, col4 = st.columns(4)
+  col1, col2, col3 = st.columns(3)
   col1.metric("Total Scanned", len(tickers))
   col2.metric("Valid Data", len(valid))
   col3.metric("Errors / Missing", len(failed_tickers))
-  high_squeeze_cnt = len(valid[valid["Squeeze Rating"] == "🔥🔥 HIGH"])
-  col4.metric("🔥 High Squeeze Candidates", high_squeeze_cnt)
 
   if not valid.empty:
     top = valid.iloc[0]
     bottom = valid.iloc[-1]
     st.success(
-        f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) |"
+        f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
         f" 📉 **Bottom Performer:** {bottom['Ticker']}"
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-  # Display Interactive Dataframe
-  st.subheader("📋 Stock Performance & Short Mechanics Table")
+  # Display interactive dataframe
+  st.subheader("📋 Stock Performance Table")
   st.dataframe(
       df.style.format(
           {
@@ -913,9 +933,9 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
-              "Float (M)": "{:.2f}M",
+              "Float (M)": "{:.2f}",
               "Short Float (%)": "{:.2f}%",
-              "Days to Cover": "{:.1f}",
+              "Days to Cover": "{:.2f}",
           },
           na_rep="N/A",
       ),
@@ -928,11 +948,13 @@ if st.session_state.get("is_running", False):
   st.download_button(
       label="📥 Download Results as CSV",
       data=csv,
-      file_name=f"biotech_squeeze_screener_{timestamp}.csv",
+      file_name=f"biotech_daily_screener_{timestamp}.csv",
       mime="text/csv",
   )
 
-  # Render Sentiment & Squeeze Dashboard
+  # ---------------------------------------------------------------------------
+  # RENDER 4-PANEL SENTIMENT DASHBOARD GRAPHS
+  # ---------------------------------------------------------------------------
   st.markdown("---")
   st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
 
@@ -955,10 +977,31 @@ if st.session_state.get("is_running", False):
       median_return = float(returns.median())
       mean_return = float(returns.mean())
 
+      # Squeeze Score Calculation
+      high_squeeze_cnt = int(
+          (clean_df["Squeeze Rating"] == "🔥🔥 HIGH").sum()
+      )
+      med_squeeze_cnt = int((clean_df["Squeeze Rating"] == "🔥 MED").sum())
+      squeeze_score = float(
+          np.clip(
+              ((high_squeeze_cnt * 2 + med_squeeze_cnt) / max(1, total))
+              * 100
+              * 3,
+              -100,
+              100,
+          )
+      )
+
       breadth_score = advance_pct - decline_pct
       return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
+
+      # Enhanced 3-Factor Composite Sentiment Score
       score = float(
-          np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100)
+          np.clip(
+              0.50 * breadth_score + 0.30 * return_score + 0.20 * squeeze_score,
+              -100,
+              100,
+          )
       )
 
       if score <= -60:
@@ -985,16 +1028,14 @@ if st.session_state.get("is_running", False):
       ax_distribution = fig.add_subplot(gs[1, 1])
 
       fig.suptitle(
-          "BIOTECH SECTOR SENTIMENT & SQUEEZE DASHBOARD",
-          fontsize=18,
-          fontweight="bold",
+          "BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18, fontweight="bold"
       )
 
       for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
         ax.set_facecolor("#ffffff")
         ax.set_axisbelow(True)
 
-      # Panel 1: Score
+      # Panel 1
       ax_score.set_title(
           "1. Composite Sentiment Score",
           fontsize=12,
@@ -1056,7 +1097,7 @@ if st.session_state.get("is_running", False):
       for spine in ax_score.spines.values():
         spine.set_visible(False)
 
-      # Panel 2: Breadth
+      # Panel 2
       ax_breadth.set_title(
           "2. Market Breadth",
           fontsize=12,
@@ -1094,9 +1135,9 @@ if st.session_state.get("is_running", False):
       for spine in ["top", "right"]:
         ax_breadth.spines[spine].set_visible(False)
 
-      # Panel 3: Summary
+      # Panel 3
       ax_summary.set_title(
-          "3. Sector & Squeeze Summary",
+          "3. Sector Summary",
           fontsize=12,
           fontweight="bold",
           loc="left",
@@ -1143,7 +1184,7 @@ if st.session_state.get("is_running", False):
       ax_summary.text(
           0.05,
           0.48,
-          "KEY STATISTICS & MECHANICS",
+          "KEY STATISTICS",
           transform=ax_summary.transAxes,
           fontsize=8,
           color="#6c757d",
@@ -1154,8 +1195,7 @@ if st.session_state.get("is_running", False):
           0.36,
           f"Stocks analyzed: {total}\nAdvancers: {advancers}"
           f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
-          f" ({decline_pct:.1f}%)\nHigh Squeeze Setups:"
-          f" {high_squeeze_cnt}\nMedian return: {median_return:+.2f}%\nMean"
+          f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
           f" return: {mean_return:+.2f}%",
           transform=ax_summary.transAxes,
           fontsize=9,
@@ -1163,7 +1203,7 @@ if st.session_state.get("is_running", False):
           va="top",
       )
 
-      # Panel 4: Distribution
+      # Panel 4
       ax_distribution.set_title(
           "4. Daily Return Distribution",
           fontsize=12,
@@ -1210,6 +1250,7 @@ if st.session_state.get("is_running", False):
       st.pyplot(fig)
       plt.close(fig)
 
+  # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 5 minutes...")
     time.sleep(300)
@@ -1219,6 +1260,6 @@ if st.session_state.get("is_running", False):
     st.rerun()
 else:
   st.info(
-      "👈 Click Run Screener & Dashboard in the sidebar to fetch live market"
-      " data, short float metrics, and sentiment graphs."
+      "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
+      " generate the graphs."
   )
