@@ -1,5 +1,7 @@
-import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -7,13 +9,15 @@ import streamlit as st
 
 # Page Configuration
 st.set_page_config(
-    page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
+    page_title="Biotech Sentiment Monitor & Squeeze Screener",
+    page_icon="🧬",
+    layout="wide",
 )
 
-st.title("🧬 BSM")
+st.title("🧬 Biotech Sentiment & Squeeze Monitor (BSM)")
 st.markdown(
-    "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
-    " visualizes market sentiment."
+    "Scans live biotech tickers, tracks price action, evaluates **Float &"
+    " Short Squeeze Metrics**, and visualizes sector-wide sentiment."
 )
 
 # Sidebar controls for Alpaca API Credentials
@@ -626,7 +630,7 @@ st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
     value=", ".join(DEFAULT_TICKERS),
-    height=250,
+    height=200,
 )
 
 # Parse tickers
@@ -635,14 +639,12 @@ tickers = list(dict.fromkeys(tickers))  # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Touch-friendly toggle switch (5 min refresh)
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 5 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 5 minutes",
 )
 
-# Refresh Data button
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
@@ -654,7 +656,6 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
-# Maintain execution state
 if run_scan:
   st.session_state["is_running"] = True
 
@@ -728,7 +729,6 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance (Regular session data)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
@@ -769,7 +769,6 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
     except Exception:
       missing_tickers.extend(batch)
 
-  # Step 2: Use Alpaca API to fulfill missing yfinance data
   if missing_tickers:
     alpaca_data, alpaca_failed = fetch_alpaca_fallback(
         missing_tickers, api_key, secret_key
@@ -780,11 +779,50 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   return price_data, failed_tickers
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_squeeze_metrics(ticker_list):
+  """Multithreaded fetching of Float, Short Interest, and Short Ratio from yfinance."""
+  import yfinance as yf
+
+  def get_single_info(ticker):
+    try:
+      info = yf.Ticker(ticker).info
+      float_shares = info.get("floatShares") or info.get("sharesOutstanding")
+      short_pct = info.get("shortPercentOfFloat")
+      short_ratio = info.get("shortRatio")
+
+      short_pct_val = (short_pct * 100) if short_pct is not None else None
+      float_m_val = (
+          (float_shares / 1_000_000) if float_shares is not None else None
+      )
+
+      return ticker, {
+          "Float (M)": float_m_val,
+          "Short Int (%)": short_pct_val,
+          "Short Ratio": short_ratio,
+      }
+    except Exception:
+      return ticker, {
+          "Float (M)": None,
+          "Short Int (%)": None,
+          "Short Ratio": None,
+      }
+
+  metrics = {}
+  with ThreadPoolExecutor(max_workers=20) as executor:
+    results = executor.map(get_single_info, ticker_list)
+    for ticker, res in results:
+      metrics[ticker] = res
+
+  return metrics
+
+
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data..."):
+  with st.spinner("Fetching live market price action & squeeze data..."):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
+    squeeze_data = fetch_squeeze_metrics(tickers)
 
   results = []
   for ticker in tickers:
@@ -795,6 +833,12 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": None,
           "Change ($)": None,
           "Daily Change (%)": None,
+          "Float (M)": None,
+          "Short Int (%)": None,
+          "Short Ratio": None,
+          "Micro Float": "NO",
+          "High Short": "NO",
+          "Squeeze Score": 0,
           "Status": "No data / insufficient history",
       })
       continue
@@ -810,6 +854,12 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
+          "Float (M)": None,
+          "Short Int (%)": None,
+          "Short Ratio": None,
+          "Micro Float": "NO",
+          "High Short": "NO",
+          "Squeeze Score": 0,
           "Status": "Invalid previous close",
       })
       continue
@@ -817,18 +867,50 @@ if st.session_state.get("is_running", False):
     change = latest_close - previous_close
     pct_change = (change / previous_close) * 100
 
+    # Retreive Float & Squeeze Metrics
+    sq_info = squeeze_data.get(
+        ticker,
+        {"Float (M)": None, "Short Int (%)": None, "Short Ratio": None},
+    )
+    float_m = sq_info["Float (M)"]
+    short_pct = sq_info["Short Int (%)"]
+    short_ratio = sq_info["Short Ratio"]
+
+    # Structural Rules Evaluation
+    is_low_float = float_m is not None and float_m <= 20.0
+    is_high_short = short_pct is not None and short_pct >= 15.0
+
+    # Calculate Custom Squeeze Score (0 to 100)
+    squeeze_score = 0
+    if pct_change >= 15.0:
+      squeeze_score += 40  # Momentum Trigger
+    if is_low_float:
+      squeeze_score += 30  # Choked Supply
+    if is_high_short:
+      squeeze_score += 30  # Trapped Shorts
+
     results.append({
         "Ticker": ticker,
         "Previous Close ($)": previous_close,
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
+        "Float (M)": float_m,
+        "Short Int (%)": short_pct,
+        "Short Ratio": short_ratio,
+        "Micro Float": "⚡ YES" if is_low_float else "NO",
+        "High Short": "🔥 YES" if is_high_short else "NO",
+        "Squeeze Score": squeeze_score,
         "Status": "OK",
     })
 
   df = pd.DataFrame(results)
+
+  # Sort primarily by Squeeze Score, then by Daily Change
   df = df.sort_values(
-      by="Daily Change (%)", ascending=False, na_position="last"
+      by=["Squeeze Score", "Daily Change (%)"],
+      ascending=[False, False],
+      na_position="last",
   ).reset_index(drop=True)
   df.insert(0, "Rank", range(1, len(df) + 1))
 
@@ -838,24 +920,36 @@ if st.session_state.get("is_running", False):
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
 
-  # Metrics summary
+  # Key Metrics Summary
   valid = df[df["Status"] == "OK"]
-  col1, col2, col3 = st.columns(3)
+  col1, col2, col3, col4 = st.columns(4)
   col1.metric("Total Scanned", len(tickers))
   col2.metric("Valid Data", len(valid))
   col3.metric("Errors / Missing", len(failed_tickers))
+  top_squeezes = len(valid[valid["Squeeze Score"] >= 70])
+  col4.metric("🔥 Squeeze Candidates", top_squeezes)
 
   if not valid.empty:
     top = valid.iloc[0]
     bottom = valid.iloc[-1]
     st.success(
-        f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
-        f" 📉 **Bottom Performer:** {bottom['Ticker']}"
+        f"🚀 **Top Squeeze Target:** {top['Ticker']} (Score:"
+        f" {top['Squeeze Score']}/100, Change: {top['Daily Change (%)']:+.2f}%)"
+        f" & 📉 **Bottom Performer:** {bottom['Ticker']}"
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-  # Display interactive dataframe
-  st.subheader("📋 Stock Performance Table")
+  # Enhanced Data Frame Table Display
+  st.subheader("📋 Stock Performance & Short Squeeze Screener")
+
+  # Highlight formatting for Squeeze Flags
+  def style_flags(val):
+    if val == "⚡ YES":
+      return "background-color: #d3f9d8; color: #2b8a3e; font-weight: bold;"
+    elif val == "🔥 YES":
+      return "background-color: #ffe3e3; color: #c92a2a; font-weight: bold;"
+    return ""
+
   st.dataframe(
       df.style.format(
           {
@@ -863,19 +957,23 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
+              "Float (M)": "{:.2f}M",
+              "Short Int (%)": "{:.1f}%",
+              "Short Ratio": "{:.1f} days",
+              "Squeeze Score": "{:d}/100",
           },
           na_rep="N/A",
-      ),
+      ).map(style_flags, subset=["Micro Float", "High Short"]),
       use_container_width=True,
   )
 
-  # CSV Download Button
+  # CSV Download
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
   csv = df.to_csv(index=False).encode("utf-8")
   st.download_button(
       label="📥 Download Results as CSV",
       data=csv,
-      file_name=f"biotech_daily_screener_{timestamp}.csv",
+      file_name=f"biotech_squeeze_screener_{timestamp}.csv",
       mime="text/csv",
   )
 
@@ -1156,7 +1254,6 @@ if st.session_state.get("is_running", False):
       st.pyplot(fig)
       plt.close(fig)
 
-  # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 5 minutes...")
     time.sleep(300)
@@ -1167,5 +1264,5 @@ if st.session_state.get("is_running", False):
 else:
   st.info(
       "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
-      " generate the graphs."
+      " generate the dashboard."
   )
