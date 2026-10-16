@@ -1,1 +1,1 @@
-# biotech-sentiment-monitor (SMB)
+# biotech-sentiment-monitor (BSM)
