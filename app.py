@@ -28,7 +28,7 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Expanded Ticker List
+# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -730,7 +730,7 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance
+  # Step 1: Process in optimized batches of 50 via yfinance (Regular session data)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
@@ -783,16 +783,25 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_ibb_price():
-  """Fetches only the latest IBB ETF price from yfinance."""
+def fetch_ibb_data():
+  """Fetches IBB ETF price data from yfinance."""
   try:
     ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="1d")
-    if not hist.empty:
-      return float(hist["Close"].iloc[-1])
+    hist = ibb.history(period="5d")
+    if len(hist) >= 2:
+      prev_close = float(hist["Close"].iloc[-2])
+      latest_close = float(hist["Close"].iloc[-1])
+      change = latest_close - prev_close
+      pct_change = (change / prev_close) * 100
+      return {
+          "price": latest_close,
+          "change": change,
+          "pct_change": pct_change,
+          "status": "OK",
+      }
   except Exception:
     pass
-  return None
+  return {"status": "Error"}
 
 
 if st.session_state.get("is_running", False):
@@ -800,7 +809,7 @@ if st.session_state.get("is_running", False):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
-    ibb_price = fetch_ibb_price()
+    ibb_info = fetch_ibb_data()
 
   results = []
   for ticker in tickers:
@@ -850,11 +859,11 @@ if st.session_state.get("is_running", False):
 
   st.session_state["df_results"] = df
   st.session_state["failed_tickers"] = failed_tickers
-  st.session_state["ibb_price"] = ibb_price
+  st.session_state["ibb_info"] = ibb_info
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
-  ibb_price = st.session_state.get("ibb_price", None)
+  ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -898,15 +907,19 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & SENTIMENT DASHBOARD GRAPHS
+  # RENDER IBB PRICE & 4-PANEL SENTIMENT DASHBOARD GRAPHS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
-  # IBB Price Metric Section (Placed directly above the dashboard)
-  if ibb_price is not None:
-    st.metric(label="IBB Price", value=f"${ibb_price:.2f}")
+  # Only IBB Price metric right above dashboard
+  if ibb_info.get("status") == "OK":
+    st.metric(
+        "IBB Price",
+        f"${ibb_info['price']:.2f}",
+        f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
+    )
   else:
-    st.metric(label="IBB Price", value="N/A")
+    st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
   st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
 
