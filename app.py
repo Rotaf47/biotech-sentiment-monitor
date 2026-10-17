@@ -914,7 +914,7 @@ if st.session_state.get("is_running", False):
   # Only IBB Price metric right above dashboard
   if ibb_info.get("status") == "OK":
     st.metric(
-        "IBB (iShares Biotechnology ETF) Price",
+        "IBB (iShares Biotechnology ETF)",
         f"${ibb_info['price']:.2f}",
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
