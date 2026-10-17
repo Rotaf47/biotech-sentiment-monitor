@@ -641,7 +641,7 @@ run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
 # Touch-friendly toggle switch (5 min refresh)
 auto_refresh = st.sidebar.toggle(
-    "🔄 Enable 5 min Auto-Refresh",
+    "🔄 Enable 1 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 5 minutes",
 )
@@ -1196,8 +1196,8 @@ if st.session_state.get("is_running", False):
 
   # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
   if auto_refresh:
-    st.info("⏳ Auto-refreshing in 5 minutes...")
-    time.sleep(300)
+    st.info("⏳ Auto-refreshing in 1 minute...")
+    time.sleep(60)
     st.cache_data.clear()
     if "df_results" in st.session_state:
       del st.session_state["df_results"]
