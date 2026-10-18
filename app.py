@@ -1017,6 +1017,9 @@ if st.session_state.get("is_running", False):
         f"${ibb_info['price']:.2f}",
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
+    st.caption(
+        "**Logic:** Tracks overarching sector health. A rising IBB supports bullish intraday long setups in top-ranked biotech stocks, whereas a declining IBB calls for defensive trading or short biases."
+    )
     
     # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
     ind_col1, ind_col2 = st.columns(2)
@@ -1034,6 +1037,9 @@ if st.session_state.get("is_running", False):
           delta=cmf_status, 
           delta_color=cmf_delta_color
       )
+      st.caption(
+          "**Logic:** Measures 5-day volume-weighted accumulation/distribution. Positive values validate aggressive institutional buying (bullish continuation); negative values signal steady distribution (bearish bias)."
+      )
         
     with ind_col2:
       if "Bullish" in divergence_info:
@@ -1048,6 +1054,9 @@ if st.session_state.get("is_running", False):
           divergence_info, 
           delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
           delta_color=div_delta_color
+      )
+      st.caption(
+          "**Logic:** Bullish Div (price down, CMF up) flags hidden accumulation for mean-reversion longs. Bearish Div (price up, CMF down) warns of fading institutional sponsorship, favoring short/fade entries."
       )
 
     # VXN Info Display under Divergence
@@ -1065,19 +1074,11 @@ if st.session_state.get("is_running", False):
           f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
           delta_color=vxn_delta_color
       )
+      st.caption(
+          "**Logic:** Gauges Nasdaq/Biotech options fear. Falling VXN environment fuels risk-on momentum pushes in speculative biotech tickers; spiking VXN triggers broad risk-off unwinding and strict intraday caution."
+      )
     else:
       st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
-
-    # Compact small text logic explanation for combined intraday strategy
-    st.markdown(
-        "<p style='font-size: 11px; color: #6c757d; margin-top: -10px; margin-bottom: 15px;'>"
-        "💡 <b>Intraday Strategy Logic:</b> Combined usage acts as a macro filter for biotech swing & intraday momentum. "
-        "<b>IBB trend</b> sets sector direction; <b>5D CMF</b> confirms institutional accumulation vs distribution beneath the surface; "
-        "<b>Price/CMF Divergence</b> highlights stealth trend reversals (e.g., Bullish Div = price down but money flowing in); "
-        "and <b>^VXN (Nasdaq Volatility)</b> acts as a risk throttle—spiking volatility signals broader market fear, requiring smaller size or tighter stops on aggressive biotech long setups."
-        "</p>",
-        unsafe_allow_html=True
-    )
 
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
