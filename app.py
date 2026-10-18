@@ -1007,7 +1007,7 @@ if st.session_state.get("is_running", False):
       "📊 Sentiment Dashboard Visuals"
   ])
 
-  # SLIDE 1: MACRO INFOS SECTION - REVISED STRATEGY LOGIC
+  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1016,6 +1016,7 @@ if st.session_state.get("is_running", False):
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
       
+      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
       ind_col1, ind_col2 = st.columns(2)
       
       cmf_val = ibb_info['cmf']
@@ -1047,10 +1048,12 @@ if st.session_state.get("is_running", False):
             delta_color=div_delta_color
         )
 
+      # VXN Info Display under Divergence
       if vxn_info.get("status") == "OK":
         vxn_val = vxn_info['price']
         vxn_change = vxn_info['change']
         vxn_pct = vxn_info['pct_change']
+        
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
         
         st.metric(
@@ -1062,29 +1065,14 @@ if st.session_state.get("is_running", False):
       else:
         st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
-      # REVISED & ACTIONABLE STRATEGY LOGIC BLOCK
+      # Rewritten Strategy Logic explanatory text
       st.markdown(
-          """
-          <div style='background-color: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #2f9e44; margin-top: 10px; margin-bottom: 15px;'>
-              <p style='font-size:13px; color:#212529; margin-bottom: 8px;'>
-                  🎯 <b>Revised Quantitative Strategy Logic & Execution Framework</b>
-              </p>
-              <ul style='font-size:12px; color:#495057; margin-bottom: 0px; padding-left: 20px; line-height: 1.5;'>
-                  <li><b>Core Thesis:</b> Biotech momentum is heavily gated by sector accumulation (IBB CMF) and broad tech volatility (^VXN). False breakouts occur when individual stock RVOL spikes without macro sector support.</li>
-                  <li><b>Long Setup Conditions (High Probability):</b> 
-                      <br/>1. IBB 5D CMF &gt; 0.05 OR a <i>Bullish Divergence</i> (price down 5D while CMF is positive/accumulating).
-                      <br/>2. ^VXN daily change &lt; 0 (falling or contracting volatility).
-                      <br/>3. <b>Action:</b> Prioritize Tier-1 daily gainer breakouts with RVOL &gt; 2.0x and positive sentiment score.
-                  </li>
-                  <li><b>Short / Defensive Setup Conditions:</b> 
-                      <br/>1. IBB 5D CMF &lt; -0.05 OR a <i>Bearish Divergence</i> (price up 5D while CMF is negative/distributing).
-                      <br/>2. ^VXN surging (&gt; +2.0% daily change).
-                      <br/>3. <b>Action:</b> Shift capital to defensive positioning, fade weak large-gap openers, or initiate strict risk-off hedging.
-                  </li>
-                  <li><b>Confirmation Filter:</b> The composite sentiment score and market breadth metrics below act as the final directional gatekeeper before taking exposure.</li>
-              </ul>
-          </div>
-          """,
+          "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
+          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
+          "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
+          "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
+          "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
+          "</p>",
           unsafe_allow_html=True
       )
     else:
