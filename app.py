@@ -824,16 +824,13 @@ def fetch_ibb_data():
           ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
       )
 
-      # Determine Divergence Condition
-      # Bullish Divergence: Price is down over 5D (< 0), but CMF is positive (>= 0)
-      # Bearish Divergence: Price is up over 5D (> 0), but CMF is negative (< 0)
-      # Aligned / Neutral otherwise
+      # Short/Compact Divergence text to fit cleanly inside the metric display
       if price_5d_change < 0 and cmf_5 >= 0:
-        divergence_info = "Bullish Divergence (Price Down / CMF Buying)"
+        divergence_info = "Bullish Div (Down/Buying)"
       elif price_5d_change > 0 and cmf_5 < 0:
-        divergence_info = "Bearish Divergence (Price Up / CMF Selling)"
+        divergence_info = "Bearish Div (Up/Selling)"
       else:
-        divergence_info = "Aligned / Neutral Trend"
+        divergence_info = "Aligned / Neutral"
 
       return {
           "price": latest_close,
@@ -1021,9 +1018,9 @@ if st.session_state.get("is_running", False):
         div_delta_color = "off"
         
       st.metric(
-          "IBB Price / CMF 5D Divergence", 
+          "Price / CMF 5D Divergence", 
           divergence_info, 
-          delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
+          delta=f"5D: {ibb_info['price_5d_change']:+.2f}%", 
           delta_color=div_delta_color
       )
 
@@ -1290,29 +1287,4 @@ if st.session_state.get("is_running", False):
           mean_return,
           color="#f08c00",
           linewidth=1.8,
-          linestyle=":",
-          label=f"Mean: {mean_return:+.2f}%",
       )
-      ax_distribution.set_xlabel("Daily change (%)", fontsize=9)
-      ax_distribution.set_ylabel("Number of stocks", fontsize=9)
-      ax_distribution.legend(loc="upper right", frameon=False, fontsize=8)
-      ax_distribution.grid(axis="y", alpha=0.2)
-      for spine in ["top", "right"]:
-        ax_distribution.spines[spine].set_visible(False)
-
-      st.pyplot(fig)
-      plt.close(fig)
-
-  # If auto-refresh toggle is active, sleep for 60 seconds (1 min) and trigger rerun
-  if auto_refresh:
-    st.info("⏳ Auto-refreshing in 1 minute...")
-    time.sleep(60)
-    st.cache_data.clear()
-    if "df_results" in st.session_state:
-      del st.session_state["df_results"]
-    st.rerun()
-else:
-  st.info(
-      "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
-      " generate the graphs."
-  )
