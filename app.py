@@ -794,7 +794,7 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  """Fetches IBB ETF price data and computes Money Flow (Inflows vs Outflows)."""
+  """Fetches IBB ETF price, return, and estimates net daily inflows/outflows."""
   try:
     ibb = yf.Ticker("IBB")
     hist = ibb.history(period="10d")
@@ -803,27 +803,27 @@ def fetch_ibb_data():
       latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
       pct_change = (change / prev_close) * 100
+      latest_vol = float(hist["Volume"].iloc[-1])
+      latest_shares_out = ibb.info.get("sharesOutstanding", None)
+
+      # Estimated Dollar Volume / Net Flow Proxy calculation
+      # Proxy formula: Estimated Flow $\approx$ Volume $\times$ Return Sign (or Price Change scaling factor)
+      # Alternatively using tick--based or volume weighted price trend approximation:
+      dollar_volume = latest_close * latest_vol
+      # Estimated net fund flow direction based on close vs open / price trend
+      latest_open = float(hist["Open"].iloc[-1])
+      flow_direction = 1 if latest_close >= latest_open else -1
       
-      high = float(hist["High"].iloc[-1])
-      low = float(hist["Low"].iloc[-1])
-      close = latest_close
-      volume = float(hist["Volume"].iloc[-1])
-
-      # Money Flow Multiplier = [(Close - Low) - (High - Close)] / (High - Low)
-      if high != low:
-        mf_multiplier = ((close - low) - (high - close)) / (high - low)
-      else:
-        mf_multiplier = 0.0
-
-      # Money Flow Volume = Volume * Money Flow Multiplier
-      # Positive value represents net inflows, negative represents net outflows
-      net_money_flow = mf_multiplier * volume * close
+      # Rough proxy estimation of daily fund flow based on volume intensity and price change magnitude
+      estimated_flow = dollar_volume * (change / prev_close) * 5  # Scaling factor proxy for institutional accumulation/distribution
 
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
-          "net_flow": net_money_flow,
+          "volume": latest_vol,
+          "dollar_volume": dollar_volume,
+          "estimated_flow": estimated_flow,
           "status": "OK",
       }
   except Exception:
@@ -964,28 +964,36 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & INFLOWS/OUTFLOWS METRICS + 4-PANEL SENTIMENT DASHBOARD
+  # RENDER IBB PRICE & FLOW METRICS + 4-PANEL SENTIMENT DASHBOARD GRAPHS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
+  # IBB Price and Inflows/Outflows Metrics Section
   if ibb_info.get("status") == "OK":
-    col_ibb1, col_ibb2 = st.columns(2)
+    col_ibb1, col_ibb2, col_ibb3 = st.columns(3)
     
     with col_ibb1:
       st.metric(
-          "IBB (iShares Biotechnology ETF)",
+          "IBB ETF Price",
           f"${ibb_info['price']:.2f}",
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
-      
+    
     with col_ibb2:
-      flow = ibb_info["net_flow"]
-      flow_label = "Estimated Net Inflows" if flow >= 0 else "Estimated Net Outflows"
+      flow_val = ibb_info['estimated_flow']
+      flow_label = "Estimated Net Inflow" if flow_val >= 0 else "Estimated Net Outflow"
       st.metric(
-          f"IBB Daily Fund Flow ({flow_label})",
-          f"${abs(flow):,.2f}",
-          delta=f"{flow:+,.2f} USD",
+          f"IBB {flow_label}",
+          f"${abs(flow_val):,.0f}",
+          delta=f"{flow_val:+,.0f} USD",
           delta_color="normal"
+      )
+
+    with col_ibb3:
+      st.metric(
+          "IBB Dollar Volume",
+          f"${ibb_info['dollar_volume']:,.0f}",
+          f"Vol: {ibb_info['volume']:,.0f}"
       )
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
@@ -1222,7 +1230,7 @@ if st.session_state.get("is_running", False):
           fontsize=12,
           fontweight="bold",
           loc="left",
-            pad=12,
+          pad=12,
       )
       display_returns = returns.clip(lower=-15, upper=15)
       ax_distribution.hist(
