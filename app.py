@@ -1007,6 +1007,27 @@ if st.session_state.get("is_running", False):
       "📊 Sentiment Dashboard Visuals"
   ])
 
+  # Custom CSS to style the active tab background/text to green
+  st.markdown(
+      """
+      <style>
+      /* Style Streamlit tab buttons */
+      button[data-baseweb="tab"] {
+          background-color: transparent !important;
+      }
+      button[data-baseweb="tab"][aria-selected="true"] {
+          background-color: #e6f4ea !important;
+          border-bottom-color: #2f9e44 !important;
+      }
+      button[data-baseweb="tab"][aria-selected="true"] p {
+          color: #2f9e44 !important;
+          font-weight: bold !important;
+      }
+      </style>
+      """,
+      unsafe_allow_html=True
+  )
+
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
@@ -1065,7 +1086,7 @@ if st.session_state.get("is_running", False):
       else:
         st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
-      # Rewritten Strategy Logic explanatory text
+      # Strategy Logic explanatory text
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
           "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
