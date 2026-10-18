@@ -1009,8 +1009,6 @@ if st.session_state.get("is_running", False):
 
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
-    st.subheader("🌐 Macro Indicators & Sector Context")
-    
     if ibb_info.get("status") == "OK":
       st.metric(
           "IBB (iShares Biotechnology ETF)",
@@ -1082,8 +1080,6 @@ if st.session_state.get("is_running", False):
 
   # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
   with tab_dashboard:
-    st.subheader("📊 Sector Sentiment & Market Breadth Dashboard")
-
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
       returns = pd.to_numeric(
