@@ -714,7 +714,6 @@ def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
             )
 
             if prev_close and latest_price:
-              # Store a DataFrame/Series representation containing Close and Volume history dummy fallback
               alpaca_data[ticker] = pd.DataFrame({
                   "Close": [prev_close, latest_price],
                   "Volume": [latest_volume, latest_volume],
@@ -739,14 +738,14 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance (fetching 30 days for RVOL calculation)
+  # Step 1: Process in optimized batches of 50 via yfinance (fetching 3 months for 63-day RVOL baseline)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
     try:
       data = yf.download(
           batch,
-          period="1mo",
+          period="3mo",
           interval="1d",
           auto_adjust=False,
           group_by="ticker",
@@ -858,16 +857,14 @@ if st.session_state.get("is_running", False):
     latest_close = float(prices.iloc[-1])
     latest_volume = float(volumes.iloc[-1])
 
-    # Calculate 20-day Average Volume (excluding today if possible, or over available history up to 20 days)
+    # Calculate 63-day (approx 3-month) Average Volume to match Finviz baseline
     if len(volumes) > 1:
-      avg_volume = float(volumes.iloc[:-1].tail(20).mean())
+      avg_volume = float(volumes.iloc[:-1].tail(63).mean())
     else:
       avg_volume = 0
 
     rvol = (
-        (latest_volume / avg_volume)
-        if avg_volume > 0
-        else float("nan")
+        (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
     )
 
     if previous_close == 0:
