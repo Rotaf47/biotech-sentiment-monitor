@@ -796,37 +796,39 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  """Fetches IBB ETF price data and estimates inflow/outflow metrics from yfinance."""
+  """Fetches IBB ETF price data and calculates CMF and OBV trend from yfinance."""
   try:
     ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="5d")
-    if len(hist) >= 2:
+    hist = ibb.history(period="3mo")
+    if len(hist) >= 20:
       prev_close = float(hist["Close"].iloc[-2])
       latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
       pct_change = (change / prev_close) * 100
 
-      latest_volume = float(hist["Volume"].iloc[-1])
-      avg_volume = float(hist["Volume"].iloc[:-1].mean())
-      vol_diff = latest_volume - avg_volume
+      # Calculate 20-period Chaikin Money Flow (CMF)
+      high = hist["High"]
+      low = hist["Low"]
+      close = hist["Close"]
+      vol = hist["Volume"]
 
-      # Approximate estimated fund flow proxy based on volume difference & price
-      est_flow_value = vol_diff * latest_close
-      
-      if est_flow_value >= 0:
-        inflow_val = est_flow_value
-        outflow_val = 0.0
-      else:
-        inflow_val = 0.0
-        outflow_val = abs(est_flow_value)
+      range_hl = high - low
+      multiplier = ((close - low) - (high - close)) / range_hl.replace(0, np.nan)
+      multiplier = multiplier.fillna(0)
+
+      mf_volume = multiplier * vol
+      cmf_20 = float(mf_volume.tail(20).sum() / vol.tail(20).sum())
+
+      # Calculate On-Balance Volume (OBV) Trend
+      obv = (np.sign(close.diff()) * vol).fillna(0).cumsum()
+      obv_trend = "Accumulation" if obv.iloc[-1] > obv.iloc[-5] else "Distribution"
 
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
-          "volume": latest_volume,
-          "inflow_value": inflow_val,
-          "outflow_value": outflow_val,
+          "cmf": cmf_20,
+          "obv_trend": obv_trend,
           "status": "OK",
       }
   except Exception:
@@ -968,7 +970,7 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & SIDE-BY-SIDE CLEAN INFLOWS VS OUTFLOWS METRICS
+  # RENDER IBB PRICE & SIDE-BY-SIDE CMF / OBV INDICATORS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
@@ -980,26 +982,31 @@ if st.session_state.get("is_running", False):
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
     
-    # Inflows vs Outflows Side-by-Side metrics
-    flow_col1, flow_col2 = st.columns(2)
+    # CMF and OBV Trend Side-by-Side metrics
+    ind_col1, ind_col2 = st.columns(2)
     
-    inflow_val = ibb_info['inflow_value']
-    outflow_val = ibb_info['outflow_value']
+    cmf_val = ibb_info['cmf']
+    obv_trend = ibb_info['obv_trend']
     
-    inflow_str = f"${inflow_val:,.0f}" if inflow_val < 1e9 else f"${inflow_val/1e9:,.2f}B"
-    outflow_str = f"${outflow_val:,.0f}" if outflow_val < 1e9 else f"${outflow_val/1e9:,.2f}B"
+    cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+    cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
     
-    with flow_col1:
-      if inflow_val > 0:
-        st.metric("Estimated Fund Inflows", inflow_str, delta="Net Buying Pressure", delta_color="normal")
-      else:
-        st.metric("Estimated Fund Inflows", "$0", delta="None", delta_color="off")
+    with ind_col1:
+      st.metric(
+          "Chaikin Money Flow (20D)", 
+          f"{cmf_val:+.3f}", 
+          delta=cmf_status, 
+          delta_color=cmf_delta_color
+      )
         
-    with flow_col2:
-      if outflow_val > 0:
-        st.metric("Estimated Fund Outflows", outflow_str, delta="Net Selling Pressure", delta_color="inverse")
-      else:
-        st.metric("Estimated Fund Outflows", "$0", delta="None", delta_color="off")
+    with ind_col2:
+      obv_delta_color = "normal" if obv_trend == "Accumulation" else "inverse"
+      st.metric(
+          "OBV Trend (5D)", 
+          obv_trend, 
+          delta="Volume Flow", 
+          delta_color=obv_delta_color
+      )
 
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
