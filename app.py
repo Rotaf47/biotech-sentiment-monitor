@@ -922,7 +922,7 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-  # Display interactive dataframe
+  # Display interactive dataframe (with index hidden)
   st.subheader("📋 Stock Performance Table")
   st.dataframe(
       df.style.format(
@@ -936,6 +936,7 @@ if st.session_state.get("is_running", False):
           na_rep="N/A",
       ),
       use_container_width=True,
+      hide_index=True,
   )
 
   # CSV Download Button
