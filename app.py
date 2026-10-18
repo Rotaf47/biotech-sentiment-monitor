@@ -738,7 +738,6 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance (fetching 3 months for 63-day RVOL baseline)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
@@ -783,7 +782,6 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
     except Exception:
       missing_tickers.extend(batch)
 
-  # Step 2: Use Alpaca API to fulfill missing yfinance data
   if missing_tickers:
     alpaca_data, alpaca_failed = fetch_alpaca_fallback(
         missing_tickers, api_key, secret_key
@@ -796,19 +794,36 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  """Fetches IBB ETF price data from yfinance."""
+  """Fetches IBB ETF price, return, and estimates net daily inflows/outflows."""
   try:
     ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="5d")
+    hist = ibb.history(period="10d")
     if len(hist) >= 2:
       prev_close = float(hist["Close"].iloc[-2])
       latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
       pct_change = (change / prev_close) * 100
+      latest_vol = float(hist["Volume"].iloc[-1])
+      latest_shares_out = ibb.info.get("sharesOutstanding", None)
+
+      # Estimated Dollar Volume / Net Flow Proxy calculation
+      # Proxy formula: Estimated Flow $\approx$ Volume $\times$ Return Sign (or Price Change scaling factor)
+      # Alternatively using tick--based or volume weighted price trend approximation:
+      dollar_volume = latest_close * latest_vol
+      # Estimated net fund flow direction based on close vs open / price trend
+      latest_open = float(hist["Open"].iloc[-1])
+      flow_direction = 1 if latest_close >= latest_open else -1
+      
+      # Rough proxy estimation of daily fund flow based on volume intensity and price change magnitude
+      estimated_flow = dollar_volume * (change / prev_close) * 5  # Scaling factor proxy for institutional accumulation/distribution
+
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
+          "volume": latest_vol,
+          "dollar_volume": dollar_volume,
+          "estimated_flow": estimated_flow,
           "status": "OK",
       }
   except Exception:
@@ -857,7 +872,6 @@ if st.session_state.get("is_running", False):
     latest_close = float(prices.iloc[-1])
     latest_volume = float(volumes.iloc[-1])
 
-    # Calculate 63-day (approx 3-month) Average Volume to match Finviz baseline
     if len(volumes) > 1:
       avg_volume = float(volumes.iloc[:-1].tail(63).mean())
     else:
@@ -950,17 +964,37 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & 4-PANEL SENTIMENT DASHBOARD GRAPHS
+  # RENDER IBB PRICE & FLOW METRICS + 4-PANEL SENTIMENT DASHBOARD GRAPHS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
-  # Only IBB Price metric right above dashboard
+  # IBB Price and Inflows/Outflows Metrics Section
   if ibb_info.get("status") == "OK":
-    st.metric(
-        "IBB (iShares Biotechnology ETF)",
-        f"${ibb_info['price']:.2f}",
-        f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
-    )
+    col_ibb1, col_ibb2, col_ibb3 = st.columns(3)
+    
+    with col_ibb1:
+      st.metric(
+          "IBB ETF Price",
+          f"${ibb_info['price']:.2f}",
+          f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
+      )
+    
+    with col_ibb2:
+      flow_val = ibb_info['estimated_flow']
+      flow_label = "Estimated Net Inflow" if flow_val >= 0 else "Estimated Net Outflow"
+      st.metric(
+          f"IBB {flow_label}",
+          f"${abs(flow_val):,.0f}",
+          delta=f"{flow_val:+,.0f} USD",
+          delta_color="normal"
+      )
+
+    with col_ibb3:
+      st.metric(
+          "IBB Dollar Volume",
+          f"${ibb_info['dollar_volume']:,.0f}",
+          f"Vol: {ibb_info['volume']:,.0f}"
+      )
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
