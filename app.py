@@ -796,7 +796,7 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  """Fetches IBB ETF price data and calculates 5D CMF and OBV trend from yfinance."""
+  """Fetches IBB ETF price data and calculates 5D CMF and Price Divergence from yfinance."""
   try:
     ibb = yf.Ticker("IBB")
     hist = ibb.history(period="1mo")
@@ -819,16 +819,29 @@ def fetch_ibb_data():
       mf_volume = multiplier * vol
       cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
 
-      # Calculate On-Balance Volume (OBV) Trend
-      obv = (np.sign(close.diff()) * vol).fillna(0).cumsum()
-      obv_trend = "Accumulation" if obv.iloc[-1] > obv.iloc[-5] else "Distribution"
+      # Calculate Price 5D Trend (percentage change over the past 5 sessions)
+      price_5d_change = float(
+          ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
+      )
+
+      # Determine Divergence Condition
+      # Bullish Divergence: Price is down over 5D (< 0), but CMF is positive (>= 0)
+      # Bearish Divergence: Price is up over 5D (> 0), but CMF is negative (< 0)
+      # Aligned / Neutral otherwise
+      if price_5d_change < 0 and cmf_5 >= 0:
+        divergence_info = "Bullish Divergence (Price Down / CMF Buying)"
+      elif price_5d_change > 0 and cmf_5 < 0:
+        divergence_info = "Bearish Divergence (Price Up / CMF Selling)"
+      else:
+        divergence_info = "Aligned / Neutral Trend"
 
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
           "cmf": cmf_5,
-          "obv_trend": obv_trend,
+          "price_5d_change": price_5d_change,
+          "divergence_info": divergence_info,
           "status": "OK",
       }
   except Exception:
@@ -970,7 +983,7 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & SIDE-BY-SIDE 5D CMF / OBV INDICATORS
+  # RENDER IBB PRICE & 5D CMF / DIVERGENCE INDICATORS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
@@ -982,11 +995,11 @@ if st.session_state.get("is_running", False):
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
     
-    # 5D CMF and OBV Trend Side-by-Side metrics
+    # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
     ind_col1, ind_col2 = st.columns(2)
     
     cmf_val = ibb_info['cmf']
-    obv_trend = ibb_info['obv_trend']
+    divergence_info = ibb_info['divergence_info']
     
     cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
     cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
@@ -1000,12 +1013,18 @@ if st.session_state.get("is_running", False):
       )
         
     with ind_col2:
-      obv_delta_color = "normal" if obv_trend == "Accumulation" else "inverse"
+      if "Bullish" in divergence_info:
+        div_delta_color = "normal"
+      elif "Bearish" in divergence_info:
+        div_delta_color = "inverse"
+      else:
+        div_delta_color = "off"
+        
       st.metric(
-          "OBV Trend (5D)", 
-          obv_trend, 
-          delta="Volume Flow", 
-          delta_color=obv_delta_color
+          "IBB Price / CMF 5D Divergence", 
+          divergence_info, 
+          delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
+          delta_color=div_delta_color
       )
 
   else:
