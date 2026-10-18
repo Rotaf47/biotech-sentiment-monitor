@@ -1017,9 +1017,6 @@ if st.session_state.get("is_running", False):
         f"${ibb_info['price']:.2f}",
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
-    st.caption(
-        "**Logic:** Tracks overarching sector health. A rising IBB supports bullish intraday long setups in top-ranked biotech stocks, whereas a declining IBB calls for defensive trading or short biases."
-    )
     
     # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
     ind_col1, ind_col2 = st.columns(2)
@@ -1037,9 +1034,6 @@ if st.session_state.get("is_running", False):
           delta=cmf_status, 
           delta_color=cmf_delta_color
       )
-      st.caption(
-          "**Logic:** Measures 5-day volume-weighted accumulation/distribution. Positive values validate aggressive institutional buying (bullish continuation); negative values signal steady distribution (bearish bias)."
-      )
         
     with ind_col2:
       if "Bullish" in divergence_info:
@@ -1054,9 +1048,6 @@ if st.session_state.get("is_running", False):
           divergence_info, 
           delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
           delta_color=div_delta_color
-      )
-      st.caption(
-          "**Logic:** Bullish Div (price down, CMF up) flags hidden accumulation for mean-reversion longs. Bearish Div (price up, CMF down) warns of fading institutional sponsorship, favoring short/fade entries."
       )
 
     # VXN Info Display under Divergence
@@ -1074,11 +1065,18 @@ if st.session_state.get("is_running", False):
           f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
           delta_color=vxn_delta_color
       )
-      st.caption(
-          "**Logic:** Gauges Nasdaq/Biotech options fear. Falling VXN environment fuels risk-on momentum pushes in speculative biotech tickers; spiking VXN triggers broad risk-off unwinding and strict intraday caution."
-      )
     else:
       st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
+
+    # Compact small text explaining combined logic for intraday trading strategy
+    st.markdown(
+        "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
+        "<b>Strategy Logic:</b> Combine IBB macro trend, CMF accumulation/distribution, and ^VXN volatility. "
+        "<b>Bullish setup:</b> Positive CMF or Bullish Divergence alongside falling/stable volatility favors long intraday setups on leading biotech stocks. "
+        "<b>Bearish setup:</b> Negative CMF or Bearish Divergence paired with surging ^VXN volatility warns of sector-wide risk-off pressure, favoring short setups or defensive caution."
+        "</p>",
+        unsafe_allow_html=True
+    )
 
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
