@@ -11,6 +11,28 @@ st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
+# Custom CSS to style Streamlit tabs to green when clicked/selected
+st.markdown(
+    """
+    <style>
+    /* Styling for Streamlit tab headers */
+    button[data-baseweb="tab"] {
+        font-weight: 600;
+    }
+    /* Style active selected tab text and border color */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #2f9e44 !important;
+        border-bottom-color: #2f9e44 !important;
+    }
+    /* Style hover state for tabs */
+    button[data-baseweb="tab"]:hover {
+        color: #2b8a3e !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🧬 BSM")
 st.markdown(
     "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
@@ -1006,27 +1028,6 @@ if st.session_state.get("is_running", False):
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals"
   ])
-
-  # Custom CSS to style the active tab background/text to green
-  st.markdown(
-      """
-      <style>
-      /* Style Streamlit tab buttons */
-      button[data-baseweb="tab"] {
-          background-color: transparent !important;
-      }
-      button[data-baseweb="tab"][aria-selected="true"] {
-          background-color: #e6f4ea !important;
-          border-bottom-color: #2f9e44 !important;
-      }
-      button[data-baseweb="tab"][aria-selected="true"] p {
-          color: #2f9e44 !important;
-          font-weight: bold !important;
-      }
-      </style>
-      """,
-      unsafe_allow_html=True
-  )
 
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
