@@ -812,15 +812,21 @@ def fetch_ibb_data():
 
       # Approximate estimated fund flow proxy based on volume difference & price
       est_flow_value = vol_diff * latest_close
-      flow_type = "Estimated Inflow" if est_flow_value >= 0 else "Estimated Outflow"
+      
+      if est_flow_value >= 0:
+        inflow_val = est_flow_value
+        outflow_val = 0.0
+      else:
+        inflow_val = 0.0
+        outflow_val = abs(est_flow_value)
 
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
           "volume": latest_volume,
-          "flow_type": flow_type,
-          "flow_value": abs(est_flow_value),
+          "inflow_value": inflow_val,
+          "outflow_value": outflow_val,
           "status": "OK",
       }
   except Exception:
@@ -962,7 +968,7 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & SIDE-BY-SIDE INFLOWS VS OUTFLOWS DASHBOARD GRAPHS
+  # RENDER IBB PRICE & SIDE-BY-SIDE CLEAN INFLOWS VS OUTFLOWS METRICS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
@@ -976,19 +982,24 @@ if st.session_state.get("is_running", False):
     
     # Inflows vs Outflows Side-by-Side metrics
     flow_col1, flow_col2 = st.columns(2)
-    flow_value_str = f"${ibb_info['flow_value']:,.0f}" if ibb_info['flow_value'] < 1e9 else f"${ibb_info['flow_value']/1e9:,.2f}B"
+    
+    inflow_val = ibb_info['inflow_value']
+    outflow_val = ibb_info['outflow_value']
+    
+    inflow_str = f"${inflow_val:,.0f}" if inflow_val < 1e9 else f"${inflow_val/1e9:,.2f}B"
+    outflow_str = f"${outflow_val:,.0f}" if outflow_val < 1e9 else f"${outflow_val/1e9:,.2f}B"
     
     with flow_col1:
-      if ibb_info['flow_type'] == "Estimated Inflow":
-        st.metric("Estimated Fund Inflows", flow_value_str, delta="Net Buying Pressure")
+      if inflow_val > 0:
+        st.metric("Estimated Fund Inflows", inflow_str, delta="Net Buying Pressure", delta_color="normal")
       else:
-        st.metric("Estimated Fund Inflows", "$0", delta="None")
+        st.metric("Estimated Fund Inflows", "$0", delta="None", delta_color="off")
         
     with flow_col2:
-      if ibb_info['flow_type'] == "Estimated Outflow":
-        st.metric("Estimated Fund Outflows", flow_value_str, delta="Net Selling Pressure", delta_color="inverse")
+      if outflow_val > 0:
+        st.metric("Estimated Fund Outflows", outflow_str, delta="Net Selling Pressure", delta_color="inverse")
       else:
-        st.metric("Estimated Fund Outflows", "$0", delta="None")
+        st.metric("Estimated Fund Outflows", "$0", delta="None", delta_color="off")
 
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
