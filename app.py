@@ -1002,8 +1002,6 @@ if st.session_state.get("is_running", False):
   # ---------------------------------------------------------------------------
   # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
   # ---------------------------------------------------------------------------
-  st.markdown("### 🔀 Navigation View")
-  
   tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals"
