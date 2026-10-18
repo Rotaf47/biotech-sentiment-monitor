@@ -1068,6 +1068,17 @@ if st.session_state.get("is_running", False):
     else:
       st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
+    # Compact small text logic explanation for combined intraday strategy
+    st.markdown(
+        "<p style='font-size: 11px; color: #6c757d; margin-top: -10px; margin-bottom: 15px;'>"
+        "💡 <b>Intraday Strategy Logic:</b> Combined usage acts as a macro filter for biotech swing & intraday momentum. "
+        "<b>IBB trend</b> sets sector direction; <b>5D CMF</b> confirms institutional accumulation vs distribution beneath the surface; "
+        "<b>Price/CMF Divergence</b> highlights stealth trend reversals (e.g., Bullish Div = price down but money flowing in); "
+        "and <b>^VXN (Nasdaq Volatility)</b> acts as a risk throttle—spiking volatility signals broader market fear, requiring smaller size or tighter stops on aggressive biotech long setups."
+        "</p>",
+        unsafe_allow_html=True
+    )
+
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
