@@ -707,9 +707,18 @@ def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
                     )
                 )
             )
+            latest_volume = (
+                snap.daily_bar.volume
+                if snap.daily_bar
+                else (snap.minute_bar.volume if snap.minute_bar else 0)
+            )
 
             if prev_close and latest_price:
-              alpaca_data[ticker] = pd.Series([prev_close, latest_price])
+              # Store a DataFrame/Series representation containing Close and Volume history dummy fallback
+              alpaca_data[ticker] = pd.DataFrame({
+                  "Close": [prev_close, latest_price],
+                  "Volume": [latest_volume, latest_volume],
+              })
             else:
               failed_list.append((ticker, "Incomplete Alpaca snapshot price"))
           else:
@@ -730,14 +739,14 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
   failed_tickers = []
   missing_tickers = []
 
-  # Step 1: Process in optimized batches of 50 via yfinance (Regular session data)
+  # Step 1: Process in optimized batches of 50 via yfinance (fetching 30 days for RVOL calculation)
   batch_size = 50
   for i in range(0, len(ticker_list), batch_size):
     batch = ticker_list[i : i + batch_size]
     try:
       data = yf.download(
           batch,
-          period="5d",
+          period="1mo",
           interval="1d",
           auto_adjust=False,
           group_by="ticker",
@@ -756,16 +765,20 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
               missing_tickers.append(ticker)
               continue
 
-          if hist.empty or "Close" not in hist.columns:
+          if (
+              hist.empty
+              or "Close" not in hist.columns
+              or "Volume" not in hist.columns
+          ):
             missing_tickers.append(ticker)
             continue
 
-          prices = hist["Close"].dropna()
-          if len(prices) < 2:
+          clean_hist = hist[["Close", "Volume"]].dropna(subset=["Close"])
+          if len(clean_hist) < 2:
             missing_tickers.append(ticker)
             continue
 
-          price_data[ticker] = prices
+          price_data[ticker] = clean_hist
         except Exception:
           missing_tickers.append(ticker)
     except Exception:
@@ -820,13 +833,42 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": None,
           "Change ($)": None,
           "Daily Change (%)": None,
+          "RVOL": None,
           "Status": "No data / insufficient history",
       })
       continue
 
-    prices = price_data[ticker]
+    df_hist = price_data[ticker]
+    prices = df_hist["Close"].dropna()
+    volumes = df_hist["Volume"].fillna(0)
+
+    if len(prices) < 2:
+      results.append({
+          "Ticker": ticker,
+          "Previous Close ($)": None,
+          "Latest Close ($)": None,
+          "Change ($)": None,
+          "Daily Change (%)": None,
+          "RVOL": None,
+          "Status": "Insufficient history",
+      })
+      continue
+
     previous_close = float(prices.iloc[-2])
     latest_close = float(prices.iloc[-1])
+    latest_volume = float(volumes.iloc[-1])
+
+    # Calculate 20-day Average Volume (excluding today if possible, or over available history up to 20 days)
+    if len(volumes) > 1:
+      avg_volume = float(volumes.iloc[:-1].tail(20).mean())
+    else:
+      avg_volume = 0
+
+    rvol = (
+        (latest_volume / avg_volume)
+        if avg_volume > 0
+        else float("nan")
+    )
 
     if previous_close == 0:
       results.append({
@@ -835,6 +877,7 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
+          "RVOL": rvol,
           "Status": "Invalid previous close",
       })
       continue
@@ -848,6 +891,7 @@ if st.session_state.get("is_running", False):
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
+        "RVOL": rvol,
         "Status": "OK",
     })
 
@@ -890,6 +934,7 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
+              "RVOL": "{:.2f}x",
           },
           na_rep="N/A",
       ),
@@ -1194,7 +1239,7 @@ if st.session_state.get("is_running", False):
       st.pyplot(fig)
       plt.close(fig)
 
-  # If auto-refresh toggle is active, sleep for 300 seconds (5 min) and trigger rerun
+  # If auto-refresh toggle is active, sleep for 60 seconds (1 min) and trigger rerun
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 1 minute...")
     time.sleep(60)
