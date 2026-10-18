@@ -11,21 +11,32 @@ st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-# Custom CSS to style Streamlit tabs to green when clicked/selected
+# Custom CSS targeting Streamlit tabs to force Active Highlight & Text to Green
 st.markdown(
     """
     <style>
-    /* Styling for Streamlit tab headers */
+    /* 1. Target tab buttons text color */
     button[data-baseweb="tab"] {
-        font-weight: 600;
+        font-weight: 600 !important;
     }
-    /* Style active selected tab text and border color */
     button[data-baseweb="tab"][aria-selected="true"] {
         color: #2f9e44 !important;
-        border-bottom-color: #2f9e44 !important;
     }
-    /* Style hover state for tabs */
-    button[data-baseweb="tab"]:hover {
+    button[data-baseweb="tab"][aria-selected="true"] p {
+        color: #2f9e44 !important;
+    }
+    
+    /* 2. Target active tab underline bar (BaseWeb tab-highlight) */
+    div[data-baseweb="tab-highlight"] {
+        background-color: #2f9e44 !important;
+    }
+
+    /* 3. Fallback for Streamlit tab container borders and hover styles */
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+        border-bottom-color: #2f9e44 !important;
+        color: #2f9e44 !important;
+    }
+    div[data-testid="stTabs"] button:hover {
         color: #2b8a3e !important;
     }
     </style>
