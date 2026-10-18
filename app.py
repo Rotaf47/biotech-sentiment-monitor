@@ -796,31 +796,31 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  """Fetches IBB ETF price data and estimates inflows/outflows from volume and price action."""
+  """Fetches IBB ETF price data and estimates inflow/outflow metrics from yfinance."""
   try:
     ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="10d")
+    hist = ibb.history(period="5d")
     if len(hist) >= 2:
       prev_close = float(hist["Close"].iloc[-2])
       latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
       pct_change = (change / prev_close) * 100
 
-      # Estimate net capital inflow/outflow proxy based on volume * price change direction over recent sessions
-      recent_volume = hist["Volume"].tail(5)
-      recent_returns = hist["Close"].pct_change().tail(5)
-      approx_flow = (recent_volume * recent_returns * hist["Close"]).sum()
+      latest_volume = float(hist["Volume"].iloc[-1])
+      avg_volume = float(hist["Volume"].iloc[:-1].mean())
+      vol_diff = latest_volume - avg_volume
 
-      flow_label = (
-          "Estimated Net Inflow" if approx_flow >= 0 else "Estimated Net Outflow"
-      )
+      # Approximate estimated fund flow proxy based on volume difference & price
+      est_flow_value = vol_diff * latest_close
+      flow_type = "Estimated Inflow" if est_flow_value >= 0 else "Estimated Outflow"
 
       return {
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
-          "net_flow": approx_flow,
-          "flow_label": flow_label,
+          "volume": latest_volume,
+          "flow_type": flow_type,
+          "flow_value": abs(est_flow_value),
           "status": "OK",
       }
   except Exception:
@@ -962,11 +962,11 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & 4-PANEL SENTIMENT DASHBOARD GRAPHS
+  # RENDER IBB PRICE & SIDE-BY-SIDE INFLOWS VS OUTFLOWS DASHBOARD GRAPHS
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
-  # Only IBB Price metric right above dashboard
+  # IBB Price metric right above dashboard
   if ibb_info.get("status") == "OK":
     st.metric(
         "IBB (iShares Biotechnology ETF)",
@@ -974,15 +974,22 @@ if st.session_state.get("is_running", False):
         f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
     )
     
-    # Display inflows/outflows info under the IBB ETF price
-    net_flow_val = ibb_info.get("net_flow", 0.0)
-    flow_label = ibb_info.get("flow_label", "Estimated Net Flow")
-    flow_color_emoji = "🟢" if net_flow_val >= 0 else "🔴"
+    # Inflows vs Outflows Side-by-Side metrics
+    flow_col1, flow_col2 = st.columns(2)
+    flow_value_str = f"${ibb_info['flow_value']:,.0f}" if ibb_info['flow_value'] < 1e9 else f"${ibb_info['flow_value']/1e9:,.2f}B"
     
-    st.markdown(
-        f"**Fund Flow Indicator:** {flow_color_emoji} **{flow_label}**: "
-        f"`${abs(net_flow_val)/1e6:,.2f}M` *(5-day volume-weighted proxy)*"
-    )
+    with flow_col1:
+      if ibb_info['flow_type'] == "Estimated Inflow":
+        st.metric("Estimated Fund Inflows", flow_value_str, delta="Net Buying Pressure")
+      else:
+        st.metric("Estimated Fund Inflows", "$0", delta="None")
+        
+    with flow_col2:
+      if ibb_info['flow_type'] == "Estimated Outflow":
+        st.metric("Estimated Fund Outflows", flow_value_str, delta="Net Selling Pressure", delta_color="inverse")
+      else:
+        st.metric("Estimated Fund Outflows", "$0", delta="None")
+
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
