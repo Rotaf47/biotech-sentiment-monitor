@@ -1068,10 +1068,11 @@ if st.session_state.get("is_running", False):
     else:
       st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
-    # Compact small text explaining combined logic for intraday trading strategy with a lightbulb icon
+    # Compact small text explaining the role of the biotech sentiment dashboard and combined logic for intraday trading strategy with a lightbulb icon
     st.markdown(
         "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
-        "💡 <b>Strategy Logic:</b> Combine IBB macro trend, CMF accumulation/distribution, and ^VXN volatility. "
+        "💡 <b>Strategy & Dashboard Role:</b> The Biotech Sentiment Dashboard acts as a macro risk monitor to filter intraday trades. "
+        "Combine IBB trend, CMF accumulation/distribution, and ^VXN volatility. "
         "<b>Bullish setup:</b> Positive CMF or Bullish Divergence alongside falling/stable volatility favors long intraday setups on leading biotech stocks. "
         "<b>Bearish setup:</b> Negative CMF or Bearish Divergence paired with surging ^VXN volatility warns of sector-wide risk-off pressure, favoring short setups or defensive caution."
         "</p>",
