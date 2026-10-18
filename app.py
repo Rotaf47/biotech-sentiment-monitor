@@ -846,12 +846,36 @@ def fetch_ibb_data():
   return {"status": "Error"}
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_vxn_data():
+  """Fetches CBOE Nasdaq Volatility Index (^VXN) data from yfinance."""
+  try:
+    vxn = yf.Ticker("^VXN")
+    hist = vxn.history(period="1mo")
+    if len(hist) >= 2:
+      prev_close = float(hist["Close"].iloc[-2])
+      latest_close = float(hist["Close"].iloc[-1])
+      change = latest_close - prev_close
+      pct_change = (change / prev_close) * 100
+
+      return {
+          "price": latest_close,
+          "change": change,
+          "pct_change": pct_change,
+          "status": "OK",
+      }
+  except Exception:
+    pass
+  return {"status": "Error"}
+
+
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
     ibb_info = fetch_ibb_data()
+    vxn_info = fetch_vxn_data()
 
   results = []
   for ticker in tickers:
@@ -931,10 +955,12 @@ if st.session_state.get("is_running", False):
   st.session_state["df_results"] = df
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
+  st.session_state["vxn_info"] = vxn_info
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
+  vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -980,7 +1006,7 @@ if st.session_state.get("is_running", False):
   )
 
   # ---------------------------------------------------------------------------
-  # RENDER IBB PRICE & 5D CMF / DIVERGENCE INDICATORS
+  # RENDER IBB PRICE & 5D CMF / DIVERGENCE INDICATORS & VXN INFO
   # ---------------------------------------------------------------------------
   st.markdown("---")
 
@@ -1023,6 +1049,24 @@ if st.session_state.get("is_running", False):
           delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
           delta_color=div_delta_color
       )
+
+    # VXN Info Display under Divergence
+    if vxn_info.get("status") == "OK":
+      vxn_val = vxn_info['price']
+      vxn_change = vxn_info['change']
+      vxn_pct = vxn_info['pct_change']
+      
+      # VXN rising is typically fear (inverse color logic for market health)
+      vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
+      
+      st.metric(
+          "CBOE NASDAQ Volatility Index (^VXN)",
+          f"{vxn_val:.2f}",
+          f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
+          delta_color=vxn_delta_color
+      )
+    else:
+      st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
   else:
     st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
