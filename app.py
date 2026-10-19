@@ -1,8 +1,10 @@
 from datetime import datetime
 import time
+from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 import yfinance as yf
 
@@ -664,6 +666,41 @@ if run_scan:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def fetch_stocktitan_reason(ticker):
+  """Scrapes StockTitan overview page to find 'Why is [ticker] stock up today?' and its explanation."""
+  url = f"https://www.stocktitan.net/overview/{ticker.lower()}/"
+  headers = {
+      "User-Agent": (
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"
+          " like Gecko) Chrome/115.0.0.0 Safari/537.36"
+      )
+  }
+  try:
+    response = requests.get(url, headers=headers, timeout=5)
+    if response.status_code == 200:
+      soup = BeautifulSoup(response.text, "html.parser")
+      # Search text case-insensitively for the question pattern
+      for el in soup.find_all(True):
+        text = el.get_text()
+        if f"why is {ticker.lower()} stock up today" in text.lower():
+          # Return the text content of the element or its parent/next sibling block
+          return text.strip()
+      
+      # Alternatively look for headers containing "Why is"
+      for heading in soup.find_all(["h2", "h3", "h4", "p", "div"]):
+        heading_text = heading.get_text()
+        if "why is" in heading_text.lower() and "stock up" in heading_text.lower():
+          # Attempt to grab subsequent text content
+          next_sibling = heading.find_next_sibling()
+          if next_sibling:
+            return f"{heading_text} - {next_sibling.get_text().strip()}"
+          return heading_text.strip()
+  except Exception:
+    pass
+  return None
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
   """Completions missing regular session data via Alpaca Snapshots."""
   from alpaca.data.enums import DataFeed
@@ -863,7 +900,7 @@ def fetch_vxn_data():
 
 
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data..."):
+  with st.spinner("Fetching live market data and StockTitan insights..."):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
@@ -871,7 +908,15 @@ if st.session_state.get("is_running", False):
     vxn_info = fetch_vxn_data()
 
   results = []
+  stocktitan_answers = {}
+
   for ticker in tickers:
+    # Scrape StockTitan for insight answer
+    titan_res = fetch_stocktitan_reason(ticker)
+    has_answer = "Yes" if titan_res else "No"
+    if titan_res:
+      stocktitan_answers[ticker] = titan_res
+
     if ticker not in price_data:
       results.append({
           "Ticker": ticker,
@@ -880,6 +925,7 @@ if st.session_state.get("is_running", False):
           "Change ($)": None,
           "Daily Change (%)": None,
           "RVOL": None,
+          "StockTitan Answer Found": has_answer,
           "Status": "No data / insufficient history",
       })
       continue
@@ -896,6 +942,7 @@ if st.session_state.get("is_running", False):
           "Change ($)": None,
           "Daily Change (%)": None,
           "RVOL": None,
+          "StockTitan Answer Found": has_answer,
           "Status": "Insufficient history",
       })
       continue
@@ -921,6 +968,7 @@ if st.session_state.get("is_running", False):
           "Change ($)": None,
           "Daily Change (%)": None,
           "RVOL": rvol,
+          "StockTitan Answer Found": has_answer,
           "Status": "Invalid previous close",
       })
       continue
@@ -935,6 +983,7 @@ if st.session_state.get("is_running", False):
         "Change ($)": change,
         "Daily Change (%)": pct_change,
         "RVOL": rvol,
+        "StockTitan Answer Found": has_answer,
         "Status": "OK",
     })
 
@@ -948,11 +997,13 @@ if st.session_state.get("is_running", False):
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
   st.session_state["vxn_info"] = vxn_info
+  st.session_state["stocktitan_answers"] = stocktitan_answers
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
+  stocktitan_answers = st.session_state.get("stocktitan_answers", {})
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -986,6 +1037,12 @@ if st.session_state.get("is_running", False):
       use_container_width=True,
       hide_index=True,
   )
+
+  # Display StockTitan Insights Expander if found
+  if stocktitan_answers:
+    with st.expander("🔍 StockTitan Insights ('Why is stock up today?' answers found)"):
+      for t, explanation in stocktitan_answers.items():
+        st.markdown(f"**{t}**: {explanation}")
 
   # CSV Download Button
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
