@@ -840,25 +840,32 @@ def fetch_ibb_data():
   return {"status": "Error"}
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=30, show_spinner=False)
 def fetch_vxn_data():
-  # Method 1: Try ticker history with fast_info check for active live prices
+  # Query intraday bars (15m) to capture live index ticks instead of waiting for daily close bars
   for symbol in ["^VXN", "VXN"]:
     try:
       ticker_obj = yf.Ticker(symbol)
-      hist = ticker_obj.history(period="5d", interval="1d")
-      if not hist.empty and "Close" in hist.columns:
-        closes = hist["Close"].dropna()
+      
+      # Fetch intraday data for today/recent session
+      df_intra = ticker_obj.history(period="2d", interval="15m")
+      if not df_intra.empty and "Close" in df_intra.columns:
+        closes = df_intra["Close"].dropna()
         if len(closes) >= 2:
-          prev_close = float(closes.iloc[-2])
           latest_close = float(closes.iloc[-1])
-
-          try:
-            live_price = ticker_obj.fast_info.get("lastPrice")
-            if live_price and live_price > 0:
-              latest_close = float(live_price)
-          except Exception:
-            pass
+          
+          # Get previous day close accurately from daily history
+          df_daily = ticker_obj.history(period="5d", interval="1d")
+          if not df_daily.empty and "Close" in df_daily.columns:
+            daily_closes = df_daily["Close"].dropna()
+            # If latest intra timestamp is today, prior close is daily_closes.iloc[-2]
+            # Otherwise use daily_closes.iloc[-1] as prev close and latest_close as current
+            if len(daily_closes) >= 2:
+              prev_close = float(daily_closes.iloc[-2])
+            else:
+              prev_close = float(closes.iloc[0])
+          else:
+            prev_close = float(closes.iloc[0])
 
           change = latest_close - prev_close
           pct_change = (change / prev_close) * 100
@@ -872,7 +879,7 @@ def fetch_vxn_data():
     except Exception:
       pass
 
-  # Method 2: Fallback via yf.download with multi-index normalization
+  # Fallback to standard daily download if intraday fails
   for symbol in ["^VXN", "VXN"]:
     try:
       df_vxn = yf.download(symbol, period="5d", interval="1d", progress=False, threads=False)
