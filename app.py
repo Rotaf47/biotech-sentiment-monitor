@@ -840,18 +840,26 @@ def fetch_ibb_data():
   return {"status": "Error"}
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def fetch_vxn_data():
-  # Method 1: Try ticker history approach
+  # Method 1: Try ticker history with fast_info check for active live prices
   for symbol in ["^VXN", "VXN"]:
     try:
       ticker_obj = yf.Ticker(symbol)
-      hist = ticker_obj.history(period="1mo")
+      hist = ticker_obj.history(period="5d", interval="1d")
       if not hist.empty and "Close" in hist.columns:
         closes = hist["Close"].dropna()
         if len(closes) >= 2:
           prev_close = float(closes.iloc[-2])
           latest_close = float(closes.iloc[-1])
+
+          try:
+            live_price = ticker_obj.fast_info.get("lastPrice")
+            if live_price and live_price > 0:
+              latest_close = float(live_price)
+          except Exception:
+            pass
+
           change = latest_close - prev_close
           pct_change = (change / prev_close) * 100
 
@@ -864,10 +872,10 @@ def fetch_vxn_data():
     except Exception:
       pass
 
-  # Method 2: Fallback to yf.download with multi-index normalization
+  # Method 2: Fallback via yf.download with multi-index normalization
   for symbol in ["^VXN", "VXN"]:
     try:
-      df_vxn = yf.download(symbol, period="1mo", interval="1d", progress=False)
+      df_vxn = yf.download(symbol, period="5d", interval="1d", progress=False, threads=False)
       if not df_vxn.empty:
         if isinstance(df_vxn.columns, pd.MultiIndex):
           df_vxn.columns = df_vxn.columns.get_level_values(0)
