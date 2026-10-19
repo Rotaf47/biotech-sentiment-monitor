@@ -842,25 +842,52 @@ def fetch_ibb_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_vxn_data():
-  try:
-    # Use yf.download which is more reliable for index endpoints like ^VXN
-    df_vxn = yf.download("^VXN", period="1mo", interval="1d", progress=False)
-    if not df_vxn.empty and "Close" in df_vxn.columns:
-      closes = df_vxn["Close"].dropna()
-      if len(closes) >= 2:
-        prev_close = float(closes.iloc[-2])
-        latest_close = float(closes.iloc[-1])
-        change = latest_close - prev_close
-        pct_change = (change / prev_close) * 100
+  # Method 1: Try ticker history approach
+  for symbol in ["^VXN", "VXN"]:
+    try:
+      ticker_obj = yf.Ticker(symbol)
+      hist = ticker_obj.history(period="1mo")
+      if not hist.empty and "Close" in hist.columns:
+        closes = hist["Close"].dropna()
+        if len(closes) >= 2:
+          prev_close = float(closes.iloc[-2])
+          latest_close = float(closes.iloc[-1])
+          change = latest_close - prev_close
+          pct_change = (change / prev_close) * 100
 
-        return {
-            "price": latest_close,
-            "change": change,
-            "pct_change": pct_change,
-            "status": "OK",
-        }
-  except Exception:
-    pass
+          return {
+              "price": latest_close,
+              "change": change,
+              "pct_change": pct_change,
+              "status": "OK",
+          }
+    except Exception:
+      pass
+
+  # Method 2: Fallback to yf.download with multi-index normalization
+  for symbol in ["^VXN", "VXN"]:
+    try:
+      df_vxn = yf.download(symbol, period="1mo", interval="1d", progress=False)
+      if not df_vxn.empty:
+        if isinstance(df_vxn.columns, pd.MultiIndex):
+          df_vxn.columns = df_vxn.columns.get_level_values(0)
+        if "Close" in df_vxn.columns:
+          closes = df_vxn["Close"].dropna()
+          if len(closes) >= 2:
+            prev_close = float(closes.iloc[-2])
+            latest_close = float(closes.iloc[-1])
+            change = latest_close - prev_close
+            pct_change = (change / prev_close) * 100
+
+            return {
+                "price": latest_close,
+                "change": change,
+                "pct_change": pct_change,
+                "status": "OK",
+            }
+    except Exception:
+      pass
+
   return {"status": "Error"}
 
 
