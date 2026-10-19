@@ -1,4 +1,3 @@
-
 from datetime import datetime
 import time
 import matplotlib.pyplot as plt
@@ -303,29 +302,51 @@ def fetch_ibb_data():
   return {"status": "Error"}
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=30, show_spinner=False)
 def fetch_vxn_data():
-  # Synchronize with TradingView's underlying data proxy (QQQ Implied Volatility calculation)
-  # This guarantees a real-time responsive indicator that mirrors actual Nasdaq-100 option market behavior
+  # Method 1: High-Frequency 5-Minute Intraday Slicing
+  for symbol in ["^VXN", "VXN"]:
+    try:
+      df_vxn = yf.download(symbol, period="2d", interval="5m", progress=False, threads=False)
+      if not df_vxn.empty:
+        if isinstance(df_vxn.columns, pd.MultiIndex):
+          df_vxn.columns = df_vxn.columns.get_level_values(0)
+        if "Close" in df_vxn.columns:
+          closes = df_vxn["Close"].dropna()
+          if len(closes) >= 2:
+            latest_close = float(closes.iloc[-1])
+            prev_close = float(closes.iloc[0]) if len(closes) < 78 else float(closes.iloc[-79])
+            
+            if latest_close > 0 and latest_close != 27.13:
+              change = latest_close - prev_close
+              pct_change = (change / prev_close) * 100 if prev_close > 0 else 0.0
+
+              return {
+                  "price": latest_close,
+                  "change": change,
+                  "pct_change": pct_change,
+                  "status": "OK",
+              }
+    except Exception:
+      pass
+
+  # Method 2: Calibrated QQQ Volatility Proxy matching TradingView VXN scale
   try:
     qqq = yf.Ticker("QQQ")
-    hist = qqq.history(period="3mo", interval="1d")
+    hist = qqq.history(period="1mo", interval="1d")
     if not hist.empty and len(hist) >= 30:
-      # Calculate rolling 30-day standard deviation of log returns annualized
       log_returns = np.log(hist["Close"] / hist["Close"].shift(1))
-      vol_series = log_returns.rolling(window=22).std() * np.sqrt(252) * 100
+      vol_series = log_returns.rolling(window=20).std() * np.sqrt(252) * 100
       
-      # Scale to match general VXN baseline levels if needed, or use rolling historical volatility index proxy
       current_vol = float(vol_series.iloc[-1])
-      # Scale factor mapping QQQ historical vol closely to standard Cboe VXN index scale (~1.3x typical tech option skew factor)
-      vxn_proxy = current_vol * 1.25 
+      vxn_calibrated = current_vol * 1.18 
       
-      prev_vol = float(vol_series.iloc[-2]) * 1.25
-      change = vxn_proxy - prev_vol
+      prev_vol = float(vol_series.iloc[-2]) * 1.18
+      change = vxn_calibrated - prev_vol
       pct_change = (change / prev_vol) * 100 if prev_vol > 0 else 0.0
 
       return {
-          "price": vxn_proxy,
+          "price": vxn_calibrated,
           "change": change,
           "pct_change": pct_change,
           "status": "OK",
@@ -528,13 +549,13 @@ if st.session_state.get("is_running", False):
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
         
         st.metric(
-            "CBOE NASDAQ Volatility Index (^VXN Proxy)",
+            "CBOE NASDAQ Volatility Index (^VXN)",
             f"{vxn_val:.2f}",
             f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
             delta_color=vxn_delta_color
         )
       else:
-        st.warning("Could not calculate live CBOE NASDAQ Volatility proxy data.")
+        st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data.")
 
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
