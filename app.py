@@ -865,7 +865,7 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_clinical_rss():
-  """Fetches all items from the StockTitan clinical trials RSS feed and extracts dynamic tickers cleanly."""
+  """Fetches all items from the StockTitan clinical trials RSS feed and extracts tickers correctly from the end (e.g. '... | AVXL Stock News')."""
   rss_url = "https://www.stocktitan.net/rss-clinical-trials"
   entries_list = []
   try:
@@ -875,19 +875,28 @@ def fetch_stocktitan_clinical_rss():
       link = entry.get("link", "#")
       published = entry.get("published", "")
       
-      # StockTitan titles typically appear as "TICKER : Headline text..."
-      ticker_part = "MARKET"
+      ticker = "MARKET"
       desc_part = title
-      if ":" in title:
+      
+      # StockTitan RSS titles format: "Description text here | TICKER Stock News"
+      if "|" in title:
+        parts = title.rsplit("|", 1)
+        desc_part = parts[0].strip()
+        right_part = parts[1].strip()  # e.g., "AVXL Stock News"
+        tokens = right_part.split()
+        if tokens:
+          potential_ticker = tokens[0].strip().upper()
+          if 1 <= len(potential_ticker) <= 6 and potential_ticker.isalnum():
+            ticker = potential_ticker
+      elif ":" in title:
         parts = title.split(":", 1)
         potential_ticker = parts[0].strip().upper()
-        # Ensure it looks like a clean stock ticker symbol (e.g. 1-6 alphanumeric characters)
         if 1 <= len(potential_ticker) <= 6 and potential_ticker.isalnum():
-          ticker_part = potential_ticker
+          ticker = potential_ticker
           desc_part = parts[1].strip()
 
       entries_list.append({
-          "ticker": ticker_part,
+          "ticker": ticker,
           "description": desc_part,
           "link": link,
           "published": published
@@ -1435,7 +1444,7 @@ if st.session_state.get("is_running", False):
         ">
             <div style="margin-bottom: 6px;">
                 {pub_badge}
-                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">{ticker} STOCK NEWS</span>
+                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
             </div>
             <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
                 <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
