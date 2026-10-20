@@ -550,6 +550,9 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
+  # Identify tickers present in the top 400 of the performance table
+  top_400_tickers = set(df.head(400)["Ticker"].str.upper().tolist())
+
   # Using Streamlit's built-in container with height to create a native scrollable view
   with st.container(height=400):
     if clinical_rss_entries:
@@ -559,13 +562,19 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
+        # Check if ticker is in top 400 and set left border color accordingly
+        if ticker in top_400_tickers:
+          border_color = "#10b981"  # Green
+        else:
+          border_color = "#3b82f6"  # Default Blue
+        
         pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
         card_html = f"""
         <div style="
             background-color: #ffffff; 
             border: 1px solid #e2e8f0; 
-            border-left: 4px solid #3b82f6; 
+            border-left: 4px solid {border_color}; 
             padding: 12px 14px; 
             margin-bottom: 12px; 
             border-radius: 6px; 
