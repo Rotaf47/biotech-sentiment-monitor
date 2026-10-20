@@ -874,7 +874,23 @@ def fetch_stocktitan_clinical_rss():
       title = entry.get("title", "No Title")
       link = entry.get("link", "#")
       published = entry.get("published", "")
-      entries_list.append({"title": title, "link": link, "published": published})
+      
+      # Extract ticker from title if formatted like "TICKER : Description"
+      ticker_part = "STOCK NEWS"
+      desc_part = title
+      if ":" in title:
+        parts = title.split(":", 1)
+        potential_ticker = parts[0].strip().upper()
+        if len(potential_ticker) <= 6 and potential_ticker.isalnum():
+          ticker_part = f"{potential_ticker} STOCK NEWS"
+          desc_part = parts[1].strip()
+
+      entries_list.append({
+          "ticker_title": ticker_part,
+          "description": desc_part,
+          "link": link,
+          "published": published
+      })
   except Exception:
     pass
   return entries_list
@@ -1387,7 +1403,7 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: PROFESSIONAL STYLIZED CARD FEED FOR CLINICAL RSS ITEMS
+  # SLIDE 3: PROFESSIONAL STYLIZED CARD FEED WITH TICKER TOP TITLE
   with tab_clinical_feed:
     st.markdown("### StockTitan Clinical Trial Results RSS Feed")
     st.markdown(
@@ -1399,28 +1415,29 @@ if st.session_state.get("is_running", False):
     
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
-        title = entry['title']
+        ticker_title = entry['ticker_title']
+        description = entry['description']
         link = entry['link']
         published = entry['published']
         
-        pub_badge = f"<span style='background-color: #e9ecef; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; margin-right: 8px;'>🕒 {published}</span>" if published else ""
+        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
         card_html = f"""
         <div style="
             background-color: #ffffff; 
             border: 1px solid #e2e8f0; 
             border-left: 4px solid #3b82f6; 
-            padding: 10px 14px; 
-            margin-bottom: 10px; 
+            padding: 12px 14px; 
+            margin-bottom: 12px; 
             border-radius: 6px; 
             box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-            transition: all 0.2s ease-in-out;
         ">
-            <div style="margin-bottom: 4px;">
+            <div style="margin-bottom: 6px;">
                 {pub_badge}
+                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">{ticker_title}</span>
             </div>
-            <div style="font-size: 12px; font-weight: 600; line-height: 1.4;">
-                <a href="{link}" target="_blank" style="text-decoration: none; color: #1d4ed8;">{title}</a>
+            <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
+                <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
             </div>
         </div>
         """
