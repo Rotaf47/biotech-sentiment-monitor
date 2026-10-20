@@ -865,12 +865,13 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_trends_data():
-  """Safely fetches related queries and topics using pytrends."""
+  """Safely fetches related queries and topics using pytrends for URL: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
   queries_list = []
   topics_list = []
   try:
     pytrends = TrendReq(hl='en-US', tz=360)
-    pytrends.build_payload(kw_list=['Therapeutics'], geo='US-MA', timeframe='now 4-H')
+    # Updated parameters: geo='US', timeframe='now 4-H'
+    pytrends.build_payload(kw_list=['Therapeutics'], geo='US', timeframe='now 4-H')
     
     # Safely fetch related queries
     related_data = pytrends.related_queries()
@@ -1413,7 +1414,7 @@ else:
 # GOOGLE TRENDS RELATED QUERIES & TOPICS DISPLAY (TWO VERTICAL LISTS)
 # ---------------------------------------------------------------------------
 st.markdown("---")
-with st.expander("🔍 Google Trends Data ('Therapeutics' - US-MA, Last 4 Hours)", expanded=True):
+with st.expander("🔍 Google Trends Data ('Therapeutics' - US, Last 4 Hours)", expanded=True):
   queries, topics = fetch_google_trends_data()
   
   col_q, col_t = st.columns(2)
