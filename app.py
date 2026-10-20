@@ -1046,10 +1046,10 @@ if st.session_state.get("is_running", False):
   # ---------------------------------------------------------------------------
   # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD VS CLINICAL TRIALS LIST)
   # ---------------------------------------------------------------------------
-  tab_macro_info, tab_dashboard, tab_clinical_top10 = st.tabs([
+  tab_macro_info, tab_dashboard, tab_clinical_all = st.tabs([
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals",
-      "🔬 Top 10 & Clinical RSS Feed"
+      "🔬 Clinical RSS Feed Matches"
   ])
 
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
@@ -1396,14 +1396,15 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: TOP 10 RANKED TICKERS WITH SAME-DAY CLINICAL TRIAL RSS MATCHES (VERTICAL, SMALL CHARACTERS)
-  with tab_clinical_top10:
-    st.markdown("### Top 10 Ranked Tickers with Same-Day Clinical Trial Results")
+  # SLIDE 3: ALL MATCHED TICKERS WITH SAME-DAY CLINICAL TRIAL RSS MATCHES (VERTICAL, SMALL CHARACTERS)
+  with tab_clinical_all:
+    st.markdown("### Scanned Tickers with Same-Day Clinical Trial Results")
     
-    top_10_df = df.head(10)
+    # Filter across all 593 tickers (the entire results DataFrame)
     matched_rows = []
+    valid_df = df[df["Status"] == "OK"]
     
-    for _, row in top_10_df.iterrows():
+    for _, row in valid_df.iterrows():
       t_symbol = row["Ticker"]
       if t_symbol in clinical_rss_tickers:
         matched_rows.append(row)
@@ -1414,18 +1415,27 @@ if st.session_state.get("is_running", False):
           unsafe_allow_html=True
       )
       for r in matched_rows:
+        pct_change_str = (
+            f"{r['Daily Change (%)']:+.2f}%" if pd.notnull(r['Daily Change (%)']) else "N/A"
+        )
+        latest_str = (
+            f"${r['Latest Close ($)']:.4f}" if pd.notnull(r['Latest Close ($)']) else "N/A"
+        )
+        rvol_str = (
+            f"{r['RVOL']:.2f}x" if pd.notnull(r['RVOL']) else "N/A"
+        )
         st.markdown(
             f"- **Rank {int(r['Rank'])} | {r['Ticker']}**: "
-            f"Change: <b>{r['Daily Change (%)']:+.2f}%</b> | "
-            f"Latest: ${r['Latest Close ($)']:.4f} | "
-            f"RVOL: {r['RVOL']:.2f}x | "
+            f"Change: <b>{pct_change_str}</b> | "
+            f"Latest: {latest_str} | "
+            f"RVOL: {rvol_str} | "
             f"<a href='{r['Overview']}' target='_blank'>StockTitan Overview</a>",
             unsafe_allow_html=True
         )
       st.markdown("</div>", unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No top 10 ranked tickers found with matching clinical trial results published in today's StockTitan RSS feed.</p>",
+          "<p style='font-size: 11px; color: #6c757d;'>No tickers from the scanned list were found in today's StockTitan Clinical Trial Results RSS feed.</p>",
           unsafe_allow_html=True
       )
 
