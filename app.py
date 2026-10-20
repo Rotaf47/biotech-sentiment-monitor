@@ -1387,22 +1387,44 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: UNCONDITIONAL STOCKTITAN CLINICAL RSS FEED LIST (VERTICAL, SMALL CHARACTERS)
+  # SLIDE 3: PROFESSIONAL STYLIZED CARD FEED FOR CLINICAL RSS ITEMS
   with tab_clinical_feed:
     st.markdown("### StockTitan Clinical Trial Results RSS Feed")
+    st.markdown(
+        "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
+        "Live feed tracking real-time clinical trial announcements and updates."
+        "</p>",
+        unsafe_allow_html=True
+    )
     
     if clinical_rss_entries:
-      st.markdown(
-          "<div style='font-size: 11px; line-height: 1.4;'>",
-          unsafe_allow_html=True
-      )
       for entry in clinical_rss_entries:
-        pub_str = f" [{entry['published']}]" if entry['published'] else ""
-        st.markdown(
-            f"- <a href='{entry['link']}' target='_blank'>{entry['title']}</a>{pub_str}",
-            unsafe_allow_html=True
-        )
-      st.markdown("</div>", unsafe_allow_html=True)
+        title = entry['title']
+        link = entry['link']
+        published = entry['published']
+        
+        pub_badge = f"<span style='background-color: #e9ecef; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; margin-right: 8px;'>🕒 {published}</span>" if published else ""
+        
+        card_html = f"""
+        <div style="
+            background-color: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            border-left: 4px solid #3b82f6; 
+            padding: 10px 14px; 
+            margin-bottom: 10px; 
+            border-radius: 6px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            transition: all 0.2s ease-in-out;
+        ">
+            <div style="margin-bottom: 4px;">
+                {pub_badge}
+            </div>
+            <div style="font-size: 12px; font-weight: 600; line-height: 1.4;">
+                <a href="{link}" target="_blank" style="text-decoration: none; color: #1d4ed8;">{title}</a>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
           "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
