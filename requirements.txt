@@ -1,4 +1,5 @@
 alpaca-py
+feedparser
 matplotlib
 numpy
 pandas
