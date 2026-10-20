@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-# Custom CSS fix to make the tab row bottom border span completely and stay uniform
+# Custom CSS fix for scrollable RSS feed container and uniform tab bottom borders
 st.markdown("""
 <style>
 /* Forces the tab container bottom border rule to render continuously */
@@ -22,6 +22,13 @@ st.markdown("""
 }
 [data-baseweb="tab"] {
     height: 45px;
+}
+/* Scrollable container for RSS feed cards */
+.scrollable-rss-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-bottom: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -540,7 +547,7 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # 1. STOCKTITAN CLINICAL RSS FEED SECTION (PLACED ON TOP OF SWIPE TOOL)
+  # 1. SCROLLABLE STOCKTITAN CLINICAL RSS FEED SECTION (UNDER TABLE)
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
@@ -550,6 +557,8 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
+  # Scrollable HTML wrapper container
+  cards_html_content = ""
   if clinical_rss_entries:
     for entry in clinical_rss_entries:
       ticker = entry['ticker']
@@ -559,7 +568,7 @@ if st.session_state.get("is_running", False):
       
       pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
       
-      card_html = f"""
+      cards_html_content += f"""
       <div style="
           background-color: #ffffff; 
           border: 1px solid #e2e8f0; 
@@ -578,12 +587,13 @@ if st.session_state.get("is_running", False):
           </div>
       </div>
       """
-      st.markdown(card_html, unsafe_allow_html=True)
   else:
-    st.markdown(
-        "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
-        unsafe_allow_html=True
-    )
+    cards_html_content = "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>"
+
+  st.markdown(
+      f'<div class="scrollable-rss-container">{cards_html_content}</div>',
+      unsafe_allow_html=True
+  )
 
   st.markdown("---")
 
