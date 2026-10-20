@@ -1,6 +1,9 @@
 streamlit
+yfinance
 pandas
 numpy
 matplotlib
-yfinance
+requests
+beautifulsoup4
+feedparser
 alpaca-py
