@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-# Custom CSS for 3-card height scroll box and uniform tab bottom borders
+# Custom CSS for uniform tab bottom borders
 st.markdown("""
 <style>
 /* Forces the tab container bottom border rule to render continuously */
@@ -22,13 +22,6 @@ st.markdown("""
 }
 [data-baseweb="tab"] {
     height: 45px;
-}
-/* Scrollable container customized to be exactly 3 cards high (~290px) */
-.three-card-scroll-box {
-    max-height: 295px;
-    overflow-y: auto;
-    padding-right: 6px;
-    margin-bottom: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -547,7 +540,7 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # 1. EXACTLY 3-CARD HEIGHT SCROLLABLE RSS FEED SECTION
+  # 1. NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (HEIGHT = 295px FOR ~3 CARDS)
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
@@ -557,42 +550,41 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  cards_html_content = ""
-  if clinical_rss_entries:
-    for entry in clinical_rss_entries:
-      ticker = entry['ticker']
-      description = entry['description']
-      link = entry['link']
-      published = entry['published']
-      
-      pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
-      
-      cards_html_content += f"""
-      <div style="
-          background-color: #ffffff; 
-          border: 1px solid #e2e8f0; 
-          border-left: 4px solid #3b82f6; 
-          padding: 12px 14px; 
-          margin-bottom: 12px; 
-          border-radius: 6px; 
-          box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-      ">
-          <div style="margin-bottom: 6px;">
-              {pub_badge}
-              <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
-          </div>
-          <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
-              <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
-          </div>
-      </div>
-      """
-  else:
-    cards_html_content = "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>"
-
-  st.markdown(
-      f'<div class="three-card-scroll-box">{cards_html_content}</div>',
-      unsafe_allow_html=True
-  )
+  with st.container(height=295):
+    if clinical_rss_entries:
+      for entry in clinical_rss_entries:
+        ticker = entry['ticker']
+        description = entry['description']
+        link = entry['link']
+        published = entry['published']
+        
+        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
+        
+        card_html = f"""
+        <div style="
+            background-color: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            border-left: 4px solid #3b82f6; 
+            padding: 12px 14px; 
+            margin-bottom: 12px; 
+            border-radius: 6px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        ">
+            <div style="margin-bottom: 6px;">
+                {pub_badge}
+                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
+                <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+    else:
+      st.markdown(
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
+          unsafe_allow_html=True
+      )
 
   st.markdown("---")
 
