@@ -1,5 +1,6 @@
 from datetime import datetime
 import time
+import feedparser
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -862,6 +863,32 @@ def fetch_vxn_data():
   return {"status": "Error"}
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_stocktitan_clinical_rss():
+  """Fetches the StockTitan clinical trials RSS feed and extracts today's items."""
+  rss_url = "https://www.stocktitan.net/rss-clinical-trials"
+  today_tickers = set()
+  try:
+    feed = feedparser.parse(rss_url)
+    today_date = datetime.utcnow().date()
+    for entry in feed.entries:
+      # Check published date
+      pub_parsed = getattr(entry, "published_parsed", None)
+      if pub_parsed:
+        pub_date = datetime(*pub_parsed[:6]).date()
+        if pub_date == today_date:
+          # StockTitan RSS titles usually start with Ticker, e.g., "ABOS : ..." or similar
+          title = entry.get("title", "")
+          parts = title.split(":")
+          if parts:
+            t = parts[0].strip().upper()
+            if t.isalpha() and len(t) <= 5:
+              today_tickers.add(t)
+  except Exception:
+    pass
+  return today_tickers
+
+
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
@@ -869,6 +896,7 @@ if st.session_state.get("is_running", False):
     )
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
+    clinical_rss_tickers = fetch_stocktitan_clinical_rss()
 
   results = []
   for ticker in tickers:
@@ -954,11 +982,13 @@ if st.session_state.get("is_running", False):
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
   st.session_state["vxn_info"] = vxn_info
+  st.session_state["clinical_rss_tickers"] = clinical_rss_tickers
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
+  clinical_rss_tickers = st.session_state.get("clinical_rss_tickers", set())
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -1014,11 +1044,12 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
+  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD VS CLINICAL TRIALS LIST)
   # ---------------------------------------------------------------------------
-  tab_macro_info, tab_dashboard = st.tabs([
+  tab_macro_info, tab_dashboard, tab_clinical_top10 = st.tabs([
       "📈 Macro & Sector Indicators", 
-      "📊 Sentiment Dashboard Visuals"
+      "📊 Sentiment Dashboard Visuals",
+      "🔬 Top 10 & Clinical RSS Feed"
   ])
 
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
@@ -1365,6 +1396,39 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
+  # SLIDE 3: TOP 10 RANKED TICKERS WITH SAME-DAY CLINICAL TRIAL RSS MATCHES (VERTICAL, SMALL CHARACTERS)
+  with tab_clinical_top10:
+    st.markdown("### Top 10 Ranked Tickers with Same-Day Clinical Trial Results")
+    
+    top_10_df = df.head(10)
+    matched_rows = []
+    
+    for _, row in top_10_df.iterrows():
+      t_symbol = row["Ticker"]
+      if t_symbol in clinical_rss_tickers:
+        matched_rows.append(row)
+        
+    if matched_rows:
+      st.markdown(
+          "<div style='font-size: 11px; line-height: 1.4;'>",
+          unsafe_allow_html=True
+      )
+      for r in matched_rows:
+        st.markdown(
+            f"- **Rank {int(r['Rank'])} | {r['Ticker']}**: "
+            f"Change: <b>{r['Daily Change (%)']:+.2f}%</b> | "
+            f"Latest: ${r['Latest Close ($)']:.4f} | "
+            f"RVOL: {r['RVOL']:.2f}x | "
+            f"<a href='{r['Overview']}' target='_blank'>StockTitan Overview</a>",
+            unsafe_allow_html=True
+        )
+      st.markdown("</div>", unsafe_allow_html=True)
+    else:
+      st.markdown(
+          "<p style='font-size: 11px; color: #6c757d;'>No top 10 ranked tickers found with matching clinical trial results published in today's StockTitan RSS feed.</p>",
+          unsafe_allow_html=True
+      )
+
   # Auto-refresh logic
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 1 minute...")
@@ -1378,4 +1442,3 @@ else:
       "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
       " generate the graphs."
   )
-
