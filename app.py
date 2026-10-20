@@ -865,22 +865,19 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_clinical_rss():
-  """Fetches all items from the StockTitan clinical trials RSS feed regardless of publication date."""
+  """Fetches all items from the StockTitan clinical trials RSS feed without any conditions."""
   rss_url = "https://www.stocktitan.net/rss-clinical-trials"
-  rss_tickers = set()
+  entries_list = []
   try:
     feed = feedparser.parse(rss_url)
     for entry in feed.entries:
-      # StockTitan RSS titles typically start with Ticker, e.g., "ABOS : ..."
-      title = entry.get("title", "")
-      parts = title.split(":")
-      if parts:
-        t = parts[0].strip().upper()
-        if t.isalpha() and len(t) <= 5:
-          rss_tickers.add(t)
+      title = entry.get("title", "No Title")
+      link = entry.get("link", "#")
+      published = entry.get("published", "")
+      entries_list.append({"title": title, "link": link, "published": published})
   except Exception:
     pass
-  return rss_tickers
+  return entries_list
 
 
 if st.session_state.get("is_running", False):
@@ -890,7 +887,7 @@ if st.session_state.get("is_running", False):
     )
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
-    clinical_rss_tickers = fetch_stocktitan_clinical_rss()
+    clinical_rss_entries = fetch_stocktitan_clinical_rss()
 
   results = []
   for ticker in tickers:
@@ -976,13 +973,13 @@ if st.session_state.get("is_running", False):
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
   st.session_state["vxn_info"] = vxn_info
-  st.session_state["clinical_rss_tickers"] = clinical_rss_tickers
+  st.session_state["clinical_rss_entries"] = clinical_rss_entries
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
-  clinical_rss_tickers = st.session_state.get("clinical_rss_tickers", set())
+  clinical_rss_entries = st.session_state.get("clinical_rss_entries", [])
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -1038,12 +1035,12 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD VS CLINICAL TRIALS LIST)
+  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD VS CLINICAL TRIALS FEED)
   # ---------------------------------------------------------------------------
-  tab_macro_info, tab_dashboard, tab_clinical_all = st.tabs([
+  tab_macro_info, tab_dashboard, tab_clinical_feed = st.tabs([
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals",
-      "🔬 Clinical RSS Feed Matches"
+      "🔬 StockTitan Clinical RSS Feed"
   ])
 
   # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
@@ -1390,45 +1387,25 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: ALL TICKERS PRESENT IN THE CLINICAL TRIAL RSS FEED CONTENT (VERTICAL, SMALL CHARACTERS)
-  with tab_clinical_all:
-    st.markdown("### Scanned Tickers Present in StockTitan Clinical Trial RSS Feed")
+  # SLIDE 3: UNCONDITIONAL STOCKTITAN CLINICAL RSS FEED LIST (VERTICAL, SMALL CHARACTERS)
+  with tab_clinical_feed:
+    st.markdown("### StockTitan Clinical Trial Results RSS Feed")
     
-    matched_rows = []
-    valid_df = df[df["Status"] == "OK"]
-    
-    for _, row in valid_df.iterrows():
-      t_symbol = row["Ticker"]
-      if t_symbol in clinical_rss_tickers:
-        matched_rows.append(row)
-        
-    if matched_rows:
+    if clinical_rss_entries:
       st.markdown(
           "<div style='font-size: 11px; line-height: 1.4;'>",
           unsafe_allow_html=True
       )
-      for r in matched_rows:
-        pct_change_str = (
-            f"{r['Daily Change (%)']:+.2f}%" if pd.notnull(r['Daily Change (%)']) else "N/A"
-        )
-        latest_str = (
-            f"${r['Latest Close ($)']:.4f}" if pd.notnull(r['Latest Close ($)']) else "N/A"
-        )
-        rvol_str = (
-            f"{r['RVOL']:.2f}x" if pd.notnull(r['RVOL']) else "N/A"
-        )
+      for entry in clinical_rss_entries:
+        pub_str = f" [{entry['published']}]" if entry['published'] else ""
         st.markdown(
-            f"- **Rank {int(r['Rank'])} | {r['Ticker']}**: "
-            f"Change: <b>{pct_change_str}</b> | "
-            f"Latest: {latest_str} | "
-            f"RVOL: {rvol_str} | "
-            f"<a href='{r['Overview']}' target='_blank'>StockTitan Overview</a>",
+            f"- <a href='{entry['link']}' target='_blank'>{entry['title']}</a>{pub_str}",
             unsafe_allow_html=True
         )
       st.markdown("</div>", unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No tickers from the scanned list were found in the StockTitan Clinical Trial Results RSS feed.</p>",
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
           unsafe_allow_html=True
       )
 
