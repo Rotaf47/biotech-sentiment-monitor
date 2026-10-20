@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-# Custom CSS for uniform tab bottom borders
+# Custom CSS fix to make the tab row bottom border span completely and stay uniform
 st.markdown("""
 <style>
 /* Forces the tab container bottom border rule to render continuously */
@@ -540,7 +540,7 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # 1. NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (HEIGHT = 295px FOR ~3 CARDS)
+  # 1. NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
@@ -550,7 +550,8 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  with st.container(height=295):
+  # Using Streamlit's built-in container with height to create a native scrollable view
+  with st.container(height=400):
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
         ticker = entry['ticker']
