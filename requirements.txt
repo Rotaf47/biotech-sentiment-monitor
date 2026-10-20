@@ -4,3 +4,5 @@ numpy
 pandas
 streamlit
 yfinance
+selenium
+webdriver-manager
