@@ -1,5 +1,6 @@
 from datetime import datetime
 import time
+import feedparser
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -17,9 +18,9 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🧬 BSM - Biotech Sentiment & Clinical Trial Monitor")
+st.title("🧬 BSM - Biotech Sentiment & Real-Time Trial News Feed")
 st.markdown(
-    "Scans live biotech tickers via Yahoo Finance, aggregates live clinical trial feeds, and visualizes market sentiment."
+    "Scans live biotech tickers via Yahoo Finance, aggregates real-time trial RSS feeds, and visualizes market sentiment."
 )
 
 # ---------------------------------------------------------------------------
@@ -132,105 +133,81 @@ if run_scan:
 
 
 # ---------------------------------------------------------------------------
-# 3. DATA SCRAPING & FETCHING FUNCTIONS
+# 3. REAL-TIME RSS TRIAL NEWS FEED ENGINE (TODAY & MONITORED TICKERS ONLY)
 # ---------------------------------------------------------------------------
-@st.cache_data(ttl=600, show_spinner=False)
-def fetch_stocktitan_trials():
-    """Fetches live clinical trial feed with a browser-mimicking headers session and structured fallback."""
-    url = "https://www.stocktitan.net/news/clinical-trials.html"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/",
-    }
+@st.cache_data(ttl=180, show_spinner=False)
+def fetch_live_trial_rss(monitored_tickers):
+    """Fetches real-time clinical updates strict-filtered for today's date and the monitored 593 tickers."""
+    rss_feeds = [
+        "https://www.fiercebiotech.com/rss/xml",
+        "https://www.bioworld.com/rss/12",
+        "https://www.globenewswire.com/RssFeed/industry/4573-Biotechnology/feedTitle/GlobeNewswire%20-%20Industry%20News%20on%20Biotechnology",
+        "https://www.prnewswire.com/rss/health/biotechnology-news.rss",
+    ]
     
     trials_list = []
+    monitored_set = set(monitored_tickers)
+    today_date_str = datetime.now().strftime("%Y-%m-%d")
     
-    try:
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=8)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-            items = soup.select(".news-container .item, .news-list .item, .feed-item, div[class*='news'], div[class*='article']")
-            
-            for item in items:
-                headline_el = item.find("a", class_="title") or item.find("h3") or item.find("a")
-                ticker_el = item.find("span", class_="ticker") or item.find("a", class_="ticker") or item.find("strong")
-                date_el = item.find("div", class_="date") or item.find("span", class_="time") or item.find("time")
+    for feed_url in rss_feeds:
+        try:
+            feed = feedparser.parse(feed_url)
+            for entry in feed.entries:
+                title = entry.get("title", "")
+                link = entry.get("link", "#")
                 
-                if headline_el and len(headline_el.text.strip()) > 15:
-                    headline = headline_el.text.strip()
-                    href = headline_el.get('href', '')
-                    link = f"https://www.stocktitan.net{href}" if href.startswith('/') else (href if href else "https://www.stocktitan.net")
-                    ticker = ticker_el.text.strip().replace("$", "") if ticker_el else "N/A"
-                    date_str = date_el.text.strip() if date_el else datetime.now().strftime("%m/%d/%Y")
+                # Parse publishing timestamp & strict match to TODAY
+                if "published_parsed" in entry and entry.published_parsed:
+                    pub_dt = datetime(*entry.published_parsed[:6])
+                    article_date_str = pub_dt.strftime("%Y-%m-%d")
+                    display_time = pub_dt.strftime("%m/%d/%Y %H:%M")
+                else:
+                    article_date_str = today_date_str
+                    display_time = datetime.now().strftime("%m/%d/%Y %H:%M")
+                
+                # RULE 1: STRICT DATE CHECK - Must be published today
+                if article_date_str != today_date_str:
+                    continue
                     
-                    headline_lower = headline.lower()
-                    if any(x in headline_lower for x in ["positive", "meets", "shares rise", "approval", "success", "achieved"]):
-                        sentiment = "Positive"
-                    elif any(x in headline_lower for x in ["fails", "misses", "terminated", "dropped", "negative", "loss"]):
-                        sentiment = "Negative"
-                    else:
-                        sentiment = "Neutral"
-                        
-                    trials_list.append({
-                        "Date": date_str,
-                        "Ticker": ticker,
-                        "Headline": headline,
-                        "Sentiment": sentiment,
-                        "Link": link
-                    })
-    except Exception:
-        pass
+                # RULE 2: STRICT TICKER CHECK - Must match one of the 593 tickers
+                detected_ticker = None
+                for word in title.split():
+                    clean_word = word.strip("():;,$[]{}'\"")
+                    if clean_word in monitored_set:
+                        detected_ticker = clean_word
+                        break
 
-    if not trials_list:
-        trials_list = [
-            {
-                "Date": datetime.now().strftime("%m/%d/%Y"),
-                "Ticker": "BCDA",
-                "Headline": "BioCardia Announces FDA Acceptance of De Novo Pre-Submission Package for Helix Catheter Marketing Clearance",
-                "Sentiment": "Positive",
-                "Link": "https://www.stocktitan.net"
-            },
-            {
-                "Date": datetime.now().strftime("%m/%d/%Y"),
-                "Ticker": "XBIT",
-                "Headline": "XBiotech Announces Positive Phase II Final Efficacy Results from Investigator-Sponsored TASKIN Trial",
-                "Sentiment": "Positive",
-                "Link": "https://www.stocktitan.net"
-            },
-            {
-                "Date": datetime.now().strftime("%m/%d/%Y"),
-                "Ticker": "RNAZ",
-                "Headline": "TransCode Therapeutics Present Phase 1a Clinical Trial Data for TTX-MC138 at ESMO Congress",
-                "Sentiment": "Neutral",
-                "Link": "https://www.stocktitan.net"
-            },
-            {
-                "Date": datetime.now().strftime("%m/%d/%Y"),
-                "Ticker": "CLNN",
-                "Headline": "Clene Announces New Drug Application Submission to FDA for CNM-Au8 for the Treatment of ALS",
-                "Sentiment": "Positive",
-                "Link": "https://www.stocktitan.net"
-            },
-            {
-                "Date": datetime.now().strftime("%m/%d/%Y"),
-                "Ticker": "PCSA",
-                "Headline": "Processa Pharmaceuticals Phase 2 Trial Progress Update in Metastatic Breast Cancer",
-                "Sentiment": "Neutral",
-                "Link": "https://www.stocktitan.net"
-            }
-        ]
-        
-    return pd.DataFrame(trials_list)
+                # If no matching ticker is detected in the headline, discard the item
+                if not detected_ticker:
+                    continue
+
+                # Real-time Sentiment Tagging
+                title_lower = title.lower()
+                if any(x in title_lower for x in ["positive", "meets", "shares rise", "approval", "success", "achieved", "fda approves", "phase 3 success"]):
+                    sentiment = "Positive"
+                elif any(x in title_lower for x in ["fails", "misses", "terminated", "dropped", "negative", "loss", "halted", "rejected"]):
+                    sentiment = "Negative"
+                else:
+                    sentiment = "Neutral"
+
+                trials_list.append({
+                    "Date": display_time,
+                    "Ticker": detected_ticker,
+                    "Headline": title,
+                    "Sentiment": sentiment,
+                    "Link": link
+                })
+        except Exception:
+            continue
+
+    df_trials = pd.DataFrame(trials_list)
+    if not df_trials.empty:
+        df_trials = df_trials.drop_duplicates(subset=["Headline"]).reset_index(drop=True)
+    return df_trials
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
-    """Complements missing regular session data via Alpaca Snapshots."""
     from alpaca.data.enums import DataFeed
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.requests import StockSnapshotRequest
@@ -580,20 +557,20 @@ if st.session_state.get("is_running", False):
     st.markdown("---")
 
     # ---------------------------------------------------------------------------
-    # LIVE CLINICAL TRIAL FEED SECTION
+    # LIVE REAL-TIME RSS TRIAL NEWS FEED SECTION
     # ---------------------------------------------------------------------------
-    st.subheader("🧬 Live Biotech & Clinical Trial Intelligence Feed")
-    st.caption("Aggregated clinical trial data modeled after financial intelligence platforms.")
+    st.subheader("📡 Live Real-Time Clinical Trial RSS Feed (Today Only)")
+    st.caption("Undelayed RSS feed aggregating today's clinical announcements strictly matching your monitored tickers.")
 
-    trials_df = fetch_stocktitan_trials()
+    trials_df = fetch_live_trial_rss(tickers)
 
     if not trials_df.empty:
         c_filter_col1, c_filter_col2, c_filter_col3 = st.columns(3)
         with c_filter_col1:
-            trial_search = st.text_input("🔍 Search Headlines / Drugs", "")
+            trial_search = st.text_input("🔍 Search Headlines / Keywords", "")
         with c_filter_col2:
             trial_tickers = ["All"] + sorted(list(trials_df["Ticker"].unique()))
-            selected_trial_ticker = st.selectbox("🎯 Select Stock Ticker", trial_tickers)
+            selected_trial_ticker = st.selectbox("🎯 Select Ticker", trial_tickers)
         with c_filter_col3:
             selected_trial_sentiment = st.selectbox("📊 Sentiment Filter", ["All", "Positive", "Neutral", "Negative"])
 
@@ -606,7 +583,7 @@ if st.session_state.get("is_running", False):
             filtered_trials = filtered_trials[filtered_trials["Sentiment"] == selected_trial_sentiment]
 
         tm1, tm2, tm3 = st.columns(3)
-        tm1.metric("Total Trial Alerts", len(filtered_trials))
+        tm1.metric("Today's Trial Alerts", len(filtered_trials))
         tm2.metric("Positive Catalysts", len(filtered_trials[filtered_trials["Sentiment"] == "Positive"]))
         tm3.metric("Neutral/Pending", len(filtered_trials[filtered_trials["Sentiment"] == "Neutral"]))
 
@@ -615,7 +592,7 @@ if st.session_state.get("is_running", False):
         if not filtered_trials.empty:
             for idx, row in filtered_trials.iterrows():
                 with st.container():
-                    col_d, col_h, col_s = st.columns([1.5, 7, 1.5])
+                    col_d, col_h, col_s = st.columns([1.8, 6.7, 1.5])
                     
                     with col_d:
                         st.caption(f"📅 {row['Date']}")
@@ -633,9 +610,9 @@ if st.session_state.get("is_running", False):
                             st.warning("🟡 Neutral")
                     st.markdown("---")
         else:
-            st.info("No matching clinical trials found for the selected criteria.")
+            st.info("No matching clinical updates found for your filters.")
     else:
-        st.error("Unable to load live clinical trial feed right now.")
+        st.info("No clinical trial updates found for your monitored tickers today.")
 
     st.markdown("---")
 
