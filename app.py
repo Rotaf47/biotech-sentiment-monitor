@@ -865,28 +865,22 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_clinical_rss():
-  """Fetches the StockTitan clinical trials RSS feed and extracts today's items."""
+  """Fetches all items from the StockTitan clinical trials RSS feed regardless of publication date."""
   rss_url = "https://www.stocktitan.net/rss-clinical-trials"
-  today_tickers = set()
+  rss_tickers = set()
   try:
     feed = feedparser.parse(rss_url)
-    today_date = datetime.utcnow().date()
     for entry in feed.entries:
-      # Check published date
-      pub_parsed = getattr(entry, "published_parsed", None)
-      if pub_parsed:
-        pub_date = datetime(*pub_parsed[:6]).date()
-        if pub_date == today_date:
-          # StockTitan RSS titles usually start with Ticker, e.g., "ABOS : ..." or similar
-          title = entry.get("title", "")
-          parts = title.split(":")
-          if parts:
-            t = parts[0].strip().upper()
-            if t.isalpha() and len(t) <= 5:
-              today_tickers.add(t)
+      # StockTitan RSS titles typically start with Ticker, e.g., "ABOS : ..."
+      title = entry.get("title", "")
+      parts = title.split(":")
+      if parts:
+        t = parts[0].strip().upper()
+        if t.isalpha() and len(t) <= 5:
+          rss_tickers.add(t)
   except Exception:
     pass
-  return today_tickers
+  return rss_tickers
 
 
 if st.session_state.get("is_running", False):
@@ -1396,11 +1390,10 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: ALL MATCHED TICKERS WITH SAME-DAY CLINICAL TRIAL RSS MATCHES (VERTICAL, SMALL CHARACTERS)
+  # SLIDE 3: ALL TICKERS PRESENT IN THE CLINICAL TRIAL RSS FEED CONTENT (VERTICAL, SMALL CHARACTERS)
   with tab_clinical_all:
-    st.markdown("### Scanned Tickers with Same-Day Clinical Trial Results")
+    st.markdown("### Scanned Tickers Present in StockTitan Clinical Trial RSS Feed")
     
-    # Filter across all 593 tickers (the entire results DataFrame)
     matched_rows = []
     valid_df = df[df["Status"] == "OK"]
     
@@ -1435,7 +1428,7 @@ if st.session_state.get("is_running", False):
       st.markdown("</div>", unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No tickers from the scanned list were found in today's StockTitan Clinical Trial Results RSS feed.</p>",
+          "<p style='font-size: 11px; color: #6c757d;'>No tickers from the scanned list were found in the StockTitan Clinical Trial Results RSS feed.</p>",
           unsafe_allow_html=True
       )
 
