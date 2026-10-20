@@ -562,17 +562,19 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
-        # Check if ticker is in top 400 and set left border color accordingly
+        # Check if ticker is in top 400 to set card background, keeping accent border fixed to original blue
         if ticker in top_400_tickers:
-          border_color = "#10b981"  # Green
+          card_bg = "#d1fae5"       # Soft light green background body
         else:
-          border_color = "#3b82f6"  # Default Blue
+          card_bg = "#ffffff"       # Default white body background
+        
+        border_color = "#3b82f6"    # Original default blue accent border
         
         pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
         card_html = f"""
         <div style="
-            background-color: #ffffff; 
+            background-color: {card_bg}; 
             border: 1px solid #e2e8f0; 
             border-left: 4px solid {border_color}; 
             padding: 12px 14px; 
