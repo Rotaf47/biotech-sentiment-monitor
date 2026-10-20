@@ -865,7 +865,7 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_clinical_rss():
-  """Fetches all items from the StockTitan clinical trials RSS feed without any conditions."""
+  """Fetches all items from the StockTitan clinical trials RSS feed and extracts dynamic tickers."""
   rss_url = "https://www.stocktitan.net/rss-clinical-trials"
   entries_list = []
   try:
@@ -1403,7 +1403,7 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # SLIDE 3: PROFESSIONAL STYLIZED CARD FEED WITH TICKER TOP TITLE
+  # SLIDE 3: PROFESSIONAL STYLIZED CARD FEED WITH DYNAMIC [TICKER] STOCK NEWS TITLE
   with tab_clinical_feed:
     st.markdown("### StockTitan Clinical Trial Results RSS Feed")
     st.markdown(
