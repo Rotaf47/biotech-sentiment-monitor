@@ -861,7 +861,7 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_trends_data():
-  """Direct robust fetcher matching: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
+  """Direct robust fetcher updated to: https://trends.google.com/trends/explore?date=now%201-d&geo=US&q=Therapeutics&hl=en-US"""
   queries_list = []
   topics_list = []
   try:
@@ -869,7 +869,7 @@ def fetch_google_trends_data():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     req_url = "https://trends.google.com/trends/api/explore?hl=en-US&tz=360&req=" + requests.utils.quote(
-        json.dumps({"comparisonItem": [{"keyword": "Therapeutics", "geo": "US", "time": "now 4-H"}], "category": 0, "property": ""})
+        json.dumps({"comparisonItem": [{"keyword": "Therapeutics", "geo": "US", "time": "now 1-d"}], "category": 0, "property": ""})
     )
     res = requests.get(req_url, headers=headers, timeout=8)
     if res.status_code == 200:
@@ -910,9 +910,9 @@ def fetch_google_trends_data():
     pass
 
   if not queries_list:
-    queries_list = ["No related queries found for this 4-hour window."]
+    queries_list = ["No related queries found for this 1-day timeframe."]
   if not topics_list:
-    topics_list = ["No related topics found for this 4-hour window."]
+    topics_list = ["No related topics found for this 1-day timeframe."]
 
   return queries_list[:10], topics_list[:10]
 
@@ -1274,7 +1274,7 @@ else:
 # GOOGLE TRENDS RELATED QUERIES & TOPICS DISPLAY
 # ---------------------------------------------------------------------------
 st.markdown("---")
-with st.expander("🔍 Google Trends Data ('Therapeutics' - US, Last 4 Hours)", expanded=True):
+with st.expander("🔍 Google Trends Data ('Therapeutics' - US, Last 1 Day)", expanded=True):
   queries, topics = fetch_google_trends_data()
   
   col_q, col_t = st.columns(2)
