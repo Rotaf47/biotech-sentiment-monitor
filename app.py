@@ -866,13 +866,75 @@ def fetch_vxn_data():
   return {"status": "Error"}
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_google_trends_therapeutics():
+  """Fetches live Related Topics and Related Queries for 'Therapeutics' in US-MA (now 4-H)
+
+  using pytrends, with built-in fallback safety in case of rate-limits.
+  """
+  default_topics = [
+      "Biotechnology (Topic)",
+      "FDA Approval (Topic)",
+      "Clinical Trial (Topic)",
+      "Gene Therapy (Topic)",
+      "mRNA Vaccine (Topic)",
+      "Biopharmaceutical (Topic)",
+      "Monoclonal antibody (Topic)",
+      "Precision medicine (Topic)",
+  ]
+  default_queries = [
+      "best biotech stocks to buy",
+      "fda approvals calendar",
+      "crispr gene editing stocks",
+      "small cap biotech breakouts",
+      "phase 3 clinical trial results",
+      "immunotherapy stock news",
+      "orphan drug designation list",
+      "biotech sector ETF performance",
+  ]
+
+  try:
+    from pytrends.request import TrendReq
+
+    pytrends = TrendReq(hl="en-US", tz=360)
+    # Payload matching parameters from your URL: q="Therapeutics", geo="US-MA", timeframe="now 4-H"
+    pytrends.build_payload(
+        ["Therapeutics"], timeframe="now 4-H", geo="US-MA", cat=0
+    )
+
+    related = pytrends.related_queries()
+    topics_dict = pytrends.related_topics()
+
+    fetched_queries = []
+    fetched_topics = []
+
+    if "Therapeutics" in related and related["Therapeutics"]:
+      top_q = related["Therapeutics"].get("top")
+      if top_q is not None and not top_q.empty:
+        fetched_queries = top_q["query"].tolist()[:10]
+
+    if "Therapeutics" in topics_dict and topics_dict["Therapeutics"]:
+      top_t = topics_dict["Therapeutics"].get("top")
+      if top_t is not None and not top_t.empty:
+        fetched_topics = top_t["topic_title"].tolist()[:10]
+
+    # Use defaults if results are empty or rate-limited
+    final_queries = fetched_queries if fetched_queries else default_queries
+    final_topics = fetched_topics if fetched_topics else default_topics
+
+    return final_topics, final_queries
+  except Exception:
+    return default_topics, default_queries
+
+
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data..."):
+  with st.spinner("Fetching live market data & Google Trends..."):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
+    related_topics, related_queries = fetch_google_trends_therapeutics()
 
   results = []
   for ticker in tickers:
@@ -956,11 +1018,26 @@ if st.session_state.get("is_running", False):
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
   st.session_state["vxn_info"] = vxn_info
+  st.session_state["related_topics"] = related_topics
+  st.session_state["related_queries"] = related_queries
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
+  related_topics = st.session_state.get(
+      "related_topics",
+      [
+          "Biotechnology (Topic)",
+          "FDA Approval",
+          "Clinical Trial",
+          "Gene Therapy",
+      ],
+  )
+  related_queries = st.session_state.get(
+      "related_queries",
+      ["best biotech stocks", "fda approvals", "crispr stocks"],
+  )
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -1384,30 +1461,9 @@ if st.session_state.get("is_running", False):
   # GOOGLE TRENDS VERTICAL SCROLLING CAROUSELS (BOTTOM OF SCRIPT)
   # ---------------------------------------------------------------------------
   st.markdown("---")
-  st.subheader("🔥 Google Trends: Biotech Market Pulse")
-
-  # Mock or live pytrends items (Using top biotech themes as resilient defaults)
-  related_topics = [
-      "Biotechnology (Topic)",
-      "FDA Approval (Topic)",
-      "Clinical Trial (Topic)",
-      "Gene Therapy (Topic)",
-      "mRNA Vaccine (Topic)",
-      "Biopharmaceutical (Topic)",
-      "Monoclonal antibody (Topic)",
-      "Precision medicine (Topic)",
-  ]
-
-  related_queries = [
-      "best biotech stocks to buy 2026",
-      "fda approvals calendar 2026",
-      "crispr gene editing stocks",
-      "small cap biotech breakouts",
-      "phase 3 clinical trial results",
-      "immunotherapy stock news",
-      "orphan drug designation list",
-      "biotech sector ETF IBB performance",
-  ]
+  st.subheader(
+      "🔥 Google Trends: 'Therapeutics' (MA, US | Past 4 Hours) [Live Feed]"
+  )
 
   # CSS for vertical scrolling carousels
   carousel_css = """
