@@ -2,6 +2,5 @@ alpaca-py
 matplotlib
 numpy
 pandas
-pytrends
 streamlit
 yfinance
