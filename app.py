@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+from pytrends.request import TrendReq
 import yfinance as yf
 
 # Page Configuration
@@ -862,6 +863,33 @@ def fetch_vxn_data():
   return {"status": "Error"}
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_google_trends_data():
+  """Fetches related queries and topics using pytrends based on the specified URL parameters."""
+  try:
+    pytrends = TrendReq(hl='en-US', tz=360)
+    # Mapping parameters from: https://trends.google.com/trends/explore?date=now%204-H&geo=US-MA&q=Therapeutics&hl=en-US
+    pytrends.build_payload(kw_list=['Therapeutics'], geo='US-MA', timeframe='now 4-H')
+    related_data = pytrends.related_queries()
+    related_topics_data = pytrends.related_topics()
+    
+    # Extract top queries dataframe
+    queries_list = []
+    if 'Therapeutics' in related_data and related_data['Therapeutics']['top'] is not None:
+      top_q_df = related_data['Therapeutics']['top']
+      queries_list = top_q_df['query'].tolist()[:10]  # Take top 10
+      
+    # Extract top topics dataframe
+    topics_list = []
+    if 'Therapeutics' in related_topics_data and related_topics_data['Therapeutics']['top'] is not None:
+      top_t_df = related_topics_data['Therapeutics']['top']
+      topics_list = top_t_df['topic_title'].tolist()[:10]  # Take top 10
+
+    return queries_list, topics_list
+  except Exception as e:
+    return [f"Error fetching: {e}"], []
+
+
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
@@ -1379,3 +1407,27 @@ else:
       " generate the graphs."
   )
 
+# ---------------------------------------------------------------------------
+# GOOGLE TRENDS RELATED QUERIES & TOPICS DISPLAY (TWO VERTICAL LISTS)
+# ---------------------------------------------------------------------------
+st.markdown("---")
+with st.expander("🔍 Google Trends Data ('Therapeutics' - US-MA, Last 4 Hours)", expanded=True):
+  queries, topics = fetch_google_trends_data()
+  
+  col_q, col_t = st.columns(2)
+  
+  with col_q:
+    st.subheader("Related Queries")
+    if queries:
+      for q in queries:
+        st.markdown(f"- {q}")
+    else:
+      st.write("No related queries found.")
+      
+  with col_t:
+    st.subheader("Related Topics")
+    if topics:
+      for t in topics:
+        st.markdown(f"- {t}")
+    else:
+      st.write("No related topics found.")
