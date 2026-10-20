@@ -28,7 +28,7 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
+# Expanded Ticker List
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -868,59 +868,69 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_google_trends_therapeutics():
-  """Fetches live Related Topics and Related Queries for 'Therapeutics' in US-MA (now 4-H)
+  """Fetches live Related Topics and Related Queries for 'Therapeutics' URL parameters
 
-  using pytrends, with built-in fallback safety in case of rate-limits.
+  (q='Therapeutics', geo='US-MA', timeframe='now 4-H', hl='en-US').
   """
   default_topics = [
-      "Biotechnology (Topic)",
+      "Therapeutics (Topic)",
+      "Biotechnology (Industry)",
       "FDA Approval (Topic)",
       "Clinical Trial (Topic)",
       "Gene Therapy (Topic)",
-      "mRNA Vaccine (Topic)",
-      "Biopharmaceutical (Topic)",
-      "Monoclonal antibody (Topic)",
-      "Precision medicine (Topic)",
+      "mRNA Vaccines (Topic)",
+      "Pharmaceuticals (Industry)",
+      "Precision Medicine (Topic)",
   ]
   default_queries = [
-      "best biotech stocks to buy",
-      "fda approvals calendar",
-      "crispr gene editing stocks",
-      "small cap biotech breakouts",
+      "therapeutics stocks",
+      "vertex therapeutics",
+      "sarepta therapeutics",
+      "crispr therapeutics",
+      "fda approvals 2026",
+      "biotech therapeutics news",
       "phase 3 clinical trial results",
-      "immunotherapy stock news",
-      "orphan drug designation list",
-      "biotech sector ETF performance",
+      "small cap biotech breakouts",
   ]
 
   try:
     from pytrends.request import TrendReq
 
-    pytrends = TrendReq(hl="en-US", tz=360)
-    # Payload matching parameters from your URL: q="Therapeutics", geo="US-MA", timeframe="now 4-H"
+    # Connect to Google Trends with en-US language settings
+    pytrends = TrendReq(hl="en-US", tz=300)
+
+    # Build payload using exact URL params: q="Therapeutics", geo="US-MA", timeframe="now 4-H"
     pytrends.build_payload(
-        ["Therapeutics"], timeframe="now 4-H", geo="US-MA", cat=0
+        kw_list=["Therapeutics"], timeframe="now 4-H", geo="US-MA"
     )
 
-    related = pytrends.related_queries()
+    # Extract queries and topics
+    queries_dict = pytrends.related_queries()
     topics_dict = pytrends.related_topics()
 
     fetched_queries = []
     fetched_topics = []
 
-    if "Therapeutics" in related and related["Therapeutics"]:
-      top_q = related["Therapeutics"].get("top")
-      if top_q is not None and not top_q.empty:
-        fetched_queries = top_q["query"].tolist()[:10]
+    # Process Related Queries
+    if "Therapeutics" in queries_dict and queries_dict["Therapeutics"]:
+      q_df = queries_dict["Therapeutics"].get("top")
+      if q_df is None or q_df.empty:
+        q_df = queries_dict["Therapeutics"].get("rising")
 
+      if q_df is not None and not q_df.empty:
+        fetched_queries = q_df["query"].dropna().tolist()[:10]
+
+    # Process Related Topics
     if "Therapeutics" in topics_dict and topics_dict["Therapeutics"]:
-      top_t = topics_dict["Therapeutics"].get("top")
-      if top_t is not None and not top_t.empty:
-        fetched_topics = top_t["topic_title"].tolist()[:10]
+      t_df = topics_dict["Therapeutics"].get("top")
+      if t_df is None or t_df.empty:
+        t_df = topics_dict["Therapeutics"].get("rising")
 
-    # Use defaults if results are empty or rate-limited
-    final_queries = fetched_queries if fetched_queries else default_queries
+      if t_df is not None and not t_df.empty:
+        fetched_topics = t_df["topic_title"].dropna().tolist()[:10]
+
     final_topics = fetched_topics if fetched_topics else default_topics
+    final_queries = fetched_queries if fetched_queries else default_queries
 
     return final_topics, final_queries
   except Exception:
@@ -1025,19 +1035,8 @@ if st.session_state.get("is_running", False):
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
-  related_topics = st.session_state.get(
-      "related_topics",
-      [
-          "Biotechnology (Topic)",
-          "FDA Approval",
-          "Clinical Trial",
-          "Gene Therapy",
-      ],
-  )
-  related_queries = st.session_state.get(
-      "related_queries",
-      ["best biotech stocks", "fda approvals", "crispr stocks"],
-  )
+  related_topics = st.session_state.get("related_topics", [])
+  related_queries = st.session_state.get("related_queries", [])
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -1100,7 +1099,7 @@ if st.session_state.get("is_running", False):
       "📊 Sentiment Dashboard Visuals",
   ])
 
-  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
+  # SLIDE 1: MACRO INFOS SECTION
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1161,7 +1160,6 @@ if st.session_state.get("is_running", False):
             " Yahoo Finance."
         )
 
-      # Rewritten Strategy Logic explanatory text
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
           " margin-bottom:15px;'>💡 <b>Strategy Logic:</b> Dynamic multi-factor"
@@ -1458,14 +1456,14 @@ if st.session_state.get("is_running", False):
         plt.close(fig)
 
   # ---------------------------------------------------------------------------
-  # GOOGLE TRENDS VERTICAL SCROLLING CAROUSELS (BOTTOM OF SCRIPT)
+  # GOOGLE TRENDS VERTICAL CAROUSELS SECTION (BOTTOM OF APPLICATION)
   # ---------------------------------------------------------------------------
   st.markdown("---")
   st.subheader(
-      "🔥 Google Trends: 'Therapeutics' (MA, US | Past 4 Hours) [Live Feed]"
+      "🔥 Live Google Trends: 'Therapeutics' (MA, US | Past 4 Hours)"
   )
 
-  # CSS for vertical scrolling carousels
+  # CSS for infinite vertical scrolling carousel
   carousel_css = """
     <style>
     @keyframes scrollVertical {
@@ -1473,7 +1471,7 @@ if st.session_state.get("is_running", False):
         100% { transform: translateY(-50%); }
     }
     .carousel-container {
-        height: 180px;
+        height: 200px;
         overflow: hidden;
         position: relative;
         background: #f8f9fa;
@@ -1484,21 +1482,21 @@ if st.session_state.get("is_running", False):
     .carousel-track {
         display: flex;
         flex-direction: column;
-        animation: scrollVertical 15s linear infinite;
+        animation: scrollVertical 18s linear infinite;
     }
     .carousel-container:hover .carousel-track {
         animation-play-state: paused;
     }
     .carousel-item {
-        padding: 8px 12px;
-        margin: 4px 0;
+        padding: 10px 14px;
+        margin: 5px 0;
         background: #ffffff;
         border-radius: 6px;
         border-left: 4px solid #2f9e44;
         font-size: 14px;
         font-weight: 500;
         color: #343a40;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1507,7 +1505,7 @@ if st.session_state.get("is_running", False):
     """
   st.markdown(carousel_css, unsafe_allow_html=True)
 
-  # Duplicate arrays to create a seamless infinite loop effect
+  # Duplicate lists to create seamless continuous scrolling loop
   topics_html = "".join(
       [f'<div class="carousel-item">📈 {t}</div>' for t in related_topics * 2]
   )
