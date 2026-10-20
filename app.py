@@ -1,10 +1,11 @@
 from datetime import datetime
+import json
 import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
-from pytrends.request import TrendReq
 import yfinance as yf
 
 # Page Configuration
@@ -859,38 +860,73 @@ def fetch_vxn_data():
           "status": "OK",
       }
   except Exception:
-    pass
+      pass
   return {"status": "Error"}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_trends_data():
-  """Safely fetches related queries and topics using pytrends for URL: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
+  """Fetches trends data directly for: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
   queries_list = []
   topics_list = []
   try:
-    pytrends = TrendReq(hl='en-US', tz=360)
-    # Updated parameters: geo='US', timeframe='now 4-H'
-    pytrends.build_payload(kw_list=['Therapeutics'], geo='US', timeframe='now 4-H')
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     
-    # Safely fetch related queries
-    related_data = pytrends.related_queries()
-    if related_data and 'Therapeutics' in related_data:
-      top_q = related_data['Therapeutics'].get('top')
-      if top_q is not None and not top_q.empty and 'query' in top_q.columns:
-        queries_list = top_q['query'].tolist()[:10]
+    req_url = "https://trends.google.com/trends/api/explore?hl=en-US&tz=360&req=" + requests.utils.quote(
+        json.dumps({"comparisonItem": [{"keyword": "Therapeutics", "geo": "US", "time": "now 4-H"}], "category": 0, "property": ""})
+    )
+    res = requests.get(req_url, headers=headers, timeout=10)
+    if res.status_code == 200:
+      text = res.text
+      if text.startswith(")]}',"):
+        text = text[5:]
+      data = json.loads(text)
+      
+      widgets = data.get("widgets", [])
+      for w in widgets:
+        if w.get("id") == "RELATED_QUERIES":
+          q_req = w.get("request")
+          q_token = w.get("token")
+          if q_token:
+            sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(q_req))}&token={q_token}"
+            sub_res = requests.get(sub_url, headers=headers, timeout=10)
+            if sub_res.status_code == 200:
+              sub_text = sub_res.text
+              if sub_text.startswith(")]}',"):
+                sub_text = sub_text[5:]
+              sub_data = json.loads(sub_text)
+              for item in sub_data.get("default", {}).get("rankedList", []):
+                for kw in item.get("rankedKeyword", [])[:10]:
+                  if "query" in kw:
+                    queries_list.append(kw["query"])
 
-    # Safely fetch related topics
-    related_topics_data = pytrends.related_topics()
-    if related_topics_data and 'Therapeutics' in related_topics_data:
-      top_t = related_topics_data['Therapeutics'].get('top')
-      if top_t is not None and not top_t.empty and 'topic_title' in top_t.columns:
-        topics_list = top_t['topic_title'].tolist()[:10]
+        elif w.get("id") == "RELATED_TOPICS":
+          t_req = w.get("request")
+          t_token = w.get("token")
+          if t_token:
+            sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(t_req))}&token={t_token}"
+            sub_res = requests.get(sub_url, headers=headers, timeout=10)
+            if sub_res.status_code == 200:
+              sub_text = sub_res.text
+              if sub_text.startswith(")]}',"):
+                sub_text = sub_text[5:]
+              sub_data = json.loads(sub_text)
+              for item in sub_data.get("default", {}).get("rankedList", []):
+                for kw in item.get("rankedKeyword", [])[:10]:
+                  if "topic" in kw and "title" in kw["topic"]:
+                    topics_list.append(kw["topic"]["title"])
 
   except Exception as e:
-    queries_list = [f"Error fetching: {str(e)}"]
+    pass
 
-  return queries_list, topics_list
+  if not queries_list:
+    queries_list = ["No related queries found for this short timeframe (now 4-H)."]
+  if not topics_list:
+    topics_list = ["No related topics found for this short timeframe (now 4-H)."]
+
+  return queries_list[:10], topics_list[:10]
 
 
 if st.session_state.get("is_running", False):
