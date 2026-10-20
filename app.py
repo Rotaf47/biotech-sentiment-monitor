@@ -1,10 +1,8 @@
 from datetime import datetime
-import json
 import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import requests
 import streamlit as st
 import yfinance as yf
 
@@ -30,7 +28,7 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Expanded Ticker List
+# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -635,17 +633,20 @@ tickers_input = st.sidebar.text_area(
     height=250,
 )
 
+# Parse tickers
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-tickers = list(dict.fromkeys(tickers))
+tickers = list(dict.fromkeys(tickers))  # remove duplicates
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
+# Touch-friendly toggle switch (1 min refresh)
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 1 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 1 minutes",
 )
 
+# Refresh Data button
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
@@ -657,12 +658,14 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
+# Maintain execution state
 if run_scan:
   st.session_state["is_running"] = True
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
+  """Completions missing regular session data via Alpaca Snapshots."""
   from alpaca.data.enums import DataFeed
   from alpaca.data.historical import StockHistoricalDataClient
   from alpaca.data.requests import StockSnapshotRequest
@@ -859,64 +862,6 @@ def fetch_vxn_data():
   return {"status": "Error"}
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_google_trends_data():
-  """Direct robust fetcher updated to: https://trends.google.com/trends/explore?date=now%201-d&geo=US&q=Therapeutics&hl=en-US"""
-  queries_list = []
-  topics_list = []
-  try:
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    req_url = "https://trends.google.com/trends/api/explore?hl=en-US&tz=360&req=" + requests.utils.quote(
-        json.dumps({"comparisonItem": [{"keyword": "Therapeutics", "geo": "US", "time": "now 1-d"}], "category": 0, "property": ""})
-    )
-    res = requests.get(req_url, headers=headers, timeout=8)
-    if res.status_code == 200:
-      text = res.text
-      if text.startswith(")]}',"):
-        text = text[5:]
-      data = json.loads(text)
-      for w in data.get("widgets", []):
-        if w.get("id") == "RELATED_QUERIES":
-          q_req, q_token = w.get("request"), w.get("token")
-          if q_token:
-            sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(q_req))}&token={q_token}"
-            sub_res = requests.get(sub_url, headers=headers, timeout=8)
-            if sub_res.status_code == 200:
-              sub_text = sub_res.text
-              if sub_text.startswith(")]}',"):
-                sub_text = sub_text[5:]
-              sub_data = json.loads(sub_text)
-              for item in sub_data.get("default", {}).get("rankedList", []):
-                for kw in item.get("rankedKeyword", [])[:10]:
-                  if "query" in kw:
-                    queries_list.append(kw["query"])
-        elif w.get("id") == "RELATED_TOPICS":
-          t_req, t_token = w.get("request"), w.get("token")
-          if t_token:
-            sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(t_req))}&token={t_token}"
-            sub_res = requests.get(sub_url, headers=headers, timeout=8)
-            if sub_res.status_code == 200:
-              sub_text = sub_res.text
-              if sub_text.startswith(")]}',"):
-                sub_text = sub_text[5:]
-              sub_data = json.loads(sub_text)
-              for item in sub_data.get("default", {}).get("rankedList", []):
-                for kw in item.get("rankedKeyword", [])[:10]:
-                  if "topic" in kw and "title" in kw["topic"]:
-                    topics_list.append(kw["topic"]["title"])
-  except Exception:
-    pass
-
-  if not queries_list:
-    queries_list = ["No related queries found for this 1-day timeframe."]
-  if not topics_list:
-    topics_list = ["No related topics found for this 1-day timeframe."]
-
-  return queries_list[:10], topics_list[:10]
-
-
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
@@ -1015,6 +960,7 @@ if st.session_state.get("is_running", False):
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
 
+  # Metrics summary
   valid = df[df["Status"] == "OK"]
   col1, col2, col3 = st.columns(3)
   col1.metric("Total Scanned", len(tickers))
@@ -1030,6 +976,7 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
+  # Display interactive dataframe (with index hidden)
   st.subheader("📋 Stock Performance Table")
   st.dataframe(
       df.style.format(
@@ -1054,6 +1001,7 @@ if st.session_state.get("is_running", False):
       hide_index=True,
   )
 
+  # CSV Download Button
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
   csv = df.to_csv(index=False).encode("utf-8")
   st.download_button(
@@ -1065,11 +1013,15 @@ if st.session_state.get("is_running", False):
 
   st.markdown("---")
 
+  # ---------------------------------------------------------------------------
+  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
+  # ---------------------------------------------------------------------------
   tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals"
   ])
 
+  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1078,6 +1030,7 @@ if st.session_state.get("is_running", False):
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
       
+      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
       ind_col1, ind_col2 = st.columns(2)
       
       cmf_val = ibb_info['cmf']
@@ -1109,6 +1062,7 @@ if st.session_state.get("is_running", False):
             delta_color=div_delta_color
         )
 
+      # VXN Info Display under Divergence
       if vxn_info.get("status") == "OK":
         vxn_val = vxn_info['price']
         vxn_change = vxn_info['change']
@@ -1125,15 +1079,20 @@ if st.session_state.get("is_running", False):
       else:
         st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
+      # Rewritten Strategy Logic explanatory text
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
-          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries."
+          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
+          "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
+          "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
+          "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
           "</p>",
           unsafe_allow_html=True
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
+  # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
@@ -1191,7 +1150,14 @@ if st.session_state.get("is_running", False):
           ax.set_facecolor("#ffffff")
           ax.set_axisbelow(True)
 
-        ax_score.set_title("1. Composite Sentiment Score", fontsize=12, fontweight="bold", loc="left", pad=12)
+        # Panel 1
+        ax_score.set_title(
+            "1. Composite Sentiment Score",
+            fontsize=12,
+            fontweight="bold",
+            loc="left",
+            pad=12,
+        )
         zone_colors = [
             (-100, -60, "#c92a2a"),
             (-60, -30, "#f08c00"),
@@ -1200,36 +1166,98 @@ if st.session_state.get("is_running", False):
             (30, 60, "#2f9e44"),
             (60, 100, "#087f5b"),
         ]
-        ax_score.barh(0, 200, left=-100, height=0.36, color="#f1f3f5", edgecolor="none")
+        ax_score.barh(
+            0, 200, left=-100, height=0.36, color="#f1f3f5", edgecolor="none"
+        )
         for left, right, color in zone_colors:
-          ax_score.barh(0, right - left, left=left, height=0.36, color=color, alpha=0.22, edgecolor="none")
-        ax_score.axvline(score, color=sentiment_color, linewidth=3, ymin=0.28, ymax=0.80)
-        ax_score.scatter([score], [0], color=sentiment_color, edgecolor="white", linewidth=1.5, s=130, zorder=5)
+          ax_score.barh(
+              0,
+              right - left,
+              left=left,
+              height=0.36,
+              color=color,
+              alpha=0.22,
+              edgecolor="none",
+          )
+        ax_score.axvline(
+            score, color=sentiment_color, linewidth=3, ymin=0.28, ymax=0.80
+        )
+        ax_score.scatter(
+            [score],
+            [0],
+            color=sentiment_color,
+            edgecolor="white",
+            linewidth=1.5,
+            s=130,
+            zorder=5,
+        )
         ax_score.axvline(0, color="#343a40", linewidth=1.2, linestyle="--")
         ax_score.set_xlim(-105, 105)
         ax_score.set_ylim(-0.8, 0.85)
         ax_score.set_yticks([])
         ax_score.set_xticks([-100, -60, -30, 0, 30, 60, 100])
         ax_score.set_xlabel(f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8)
-        ax_score.text(0.5, 0.94, sentiment, transform=ax_score.transAxes, ha="center", va="top", fontsize=12, fontweight="bold", color=sentiment_color)
+        ax_score.text(
+            0.5,
+            0.94,
+            sentiment,
+            transform=ax_score.transAxes,
+            ha="center",
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+            color=sentiment_color,
+        )
         ax_score.grid(axis="x", alpha=0.15)
         for spine in ax_score.spines.values():
           spine.set_visible(False)
 
-        ax_breadth.set_title("2. Market Breadth", fontsize=12, fontweight="bold", loc="left", pad=12)
+        # Panel 2
+        ax_breadth.set_title(
+            "2. Market Breadth",
+            fontsize=12,
+            fontweight="bold",
+            loc="left",
+            pad=12,
+        )
         breadth_labels = ["Advancing", "Declining", "Unchanged"]
         breadth_values = [advancers, decliners, unchanged]
-        bars = ax_breadth.bar(breadth_labels, breadth_values, color=["#2f9e44", "#e03131", "#adb5bd"], width=0.58, edgecolor="white", linewidth=1)
+        bars = ax_breadth.bar(
+            breadth_labels,
+            breadth_values,
+            color=["#2f9e44", "#e03131", "#adb5bd"],
+            width=0.58,
+            edgecolor="white",
+            linewidth=1,
+        )
         max_val = max(breadth_values) if breadth_values else 1
         ax_breadth.set_ylim(0, max(1, max_val * 1.30))
-        for bar, value, percentage in zip(bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]):
-          ax_breadth.annotate(f"{value} stocks\n{percentage:.1f}%", xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()), xytext=(0, 7), textcoords="offset points", ha="center", va="bottom", fontsize=8, fontweight="bold")
+        for bar, value, percentage in zip(
+            bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]
+        ):
+          ax_breadth.annotate(
+              f"{value} stocks\n{percentage:.1f}%",
+              xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+              xytext=(0, 7),
+              textcoords="offset points",
+              ha="center",
+              va="bottom",
+              fontsize=8,
+              fontweight="bold",
+          )
         ax_breadth.set_ylabel("Number of stocks", fontsize=9)
         ax_breadth.grid(axis="y", alpha=0.2)
         for spine in ["top", "right"]:
           ax_breadth.spines[spine].set_visible(False)
 
-        ax_summary.set_title("3. Sector Summary", fontsize=12, fontweight="bold", loc="left", pad=12)
+        # Panel 3
+        ax_summary.set_title(
+            "3. Sector Summary",
+            fontsize=12,
+            fontweight="bold",
+            loc="left",
+            pad=12,
+        )
         ax_summary.set_facecolor("#f8f9fa")
         ax_summary.set_xticks([])
         ax_summary.set_yticks([])
@@ -1237,19 +1265,96 @@ if st.session_state.get("is_running", False):
           spine.set_visible(True)
           spine.set_color("#dee2e6")
           spine.set_linewidth(1.2)
-        ax_summary.text(0.05, 0.88, "SECTOR SENTIMENT", transform=ax_summary.transAxes, fontsize=8, color="#6c757d", fontweight="bold")
-        ax_summary.text(0.05, 0.74, sentiment, transform=ax_summary.transAxes, fontsize=15, color=sentiment_color, fontweight="bold")
-        ax_summary.text(0.95, 0.75, f"{score:+.1f}/100", transform=ax_summary.transAxes, fontsize=12, color=sentiment_color, fontweight="bold", ha="right")
-        ax_summary.axhline(0.58, xmin=0.05, xmax=0.95, color="#dee2e6", linewidth=1)
-        ax_summary.text(0.05, 0.48, "KEY STATISTICS", transform=ax_summary.transAxes, fontsize=8, color="#6c757d", fontweight="bold")
-        ax_summary.text(0.05, 0.36, f"Stocks analyzed: {total}\nAdvancers: {advancers} ({advance_pct:.1f}%)\nDecliners: {decliners} ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean return: {mean_return:+.2f}%", transform=ax_summary.transAxes, fontsize=9, linespacing=1.4, va="top")
+        ax_summary.text(
+            0.05,
+            0.88,
+            "SECTOR SENTIMENT",
+            transform=ax_summary.transAxes,
+            fontsize=8,
+            color="#6c757d",
+            fontweight="bold",
+        )
+        ax_summary.text(
+            0.05,
+            0.74,
+            sentiment,
+            transform=ax_summary.transAxes,
+            fontsize=15,
+            color=sentiment_color,
+            fontweight="bold",
+        )
+        ax_summary.text(
+            0.95,
+            0.75,
+            f"{score:+.1f}/100",
+            transform=ax_summary.transAxes,
+            fontsize=12,
+            color=sentiment_color,
+            fontweight="bold",
+            ha="right",
+        )
+        ax_summary.axhline(
+            0.58, xmin=0.05, xmax=0.95, color="#dee2e6", linewidth=1
+        )
+        ax_summary.text(
+            0.05,
+            0.48,
+            "KEY STATISTICS",
+            transform=ax_summary.transAxes,
+            fontsize=8,
+            color="#6c757d",
+            fontweight="bold",
+        )
+        ax_summary.text(
+            0.05,
+            0.36,
+            f"Stocks analyzed: {total}\nAdvancers: {advancers}"
+            f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
+            f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
+            f" return: {mean_return:+.2f}%",
+            transform=ax_summary.transAxes,
+            fontsize=9,
+            linespacing=1.4,
+            va="top",
+        )
 
-        ax_distribution.set_title("4. Daily Return Distribution", fontsize=12, fontweight="bold", loc="left", pad=12)
+        # Panel 4
+        ax_distribution.set_title(
+            "4. Daily Return Distribution",
+            fontsize=12,
+            fontweight="bold",
+            loc="left",
+            pad=12,
+        )
         display_returns = returns.clip(lower=-15, upper=15)
-        ax_distribution.hist(display_returns, bins=30, color="#4c78a8", edgecolor="white", linewidth=0.7, alpha=0.88)
-        ax_distribution.axvline(0, color="#343a40", linestyle="--", linewidth=1.2, label="Zero return")
-        ax_distribution.axvline(median_return, color="#e03131", linewidth=1.8, label=f"Median: {median_return:+.2f}%")
-        ax_distribution.axvline(mean_return, color="#f08c00", linewidth=1.8, linestyle=":", label=f"Mean: {mean_return:+.2f}%")
+        ax_distribution.hist(
+            display_returns,
+            bins=30,
+            color="#4c78a8",
+            edgecolor="white",
+            linewidth=0.7,
+            alpha=0.88,
+        )
+        ax_distribution.axvline(
+            0,
+            color="#343a40",
+            linestyle="--",
+            linewidth=1.2,
+            label="Zero return",
+        )
+        ax_distribution.axvline(
+            median_return,
+            color="#e03131",
+            linewidth=1.8,
+            label=f"Median: {median_return:+.2f}%",
+        )
+        ax_distribution.axvline(
+            mean_return,
+            color="#f08c00",
+            linewidth=1.8,
+            linestyle=":",
+            label=f"Mean: {mean_return:+.2f}%",
+        )
         ax_distribution.set_xlabel("Daily change (%)", fontsize=9)
         ax_distribution.set_ylabel("Number of stocks", fontsize=9)
         ax_distribution.legend(loc="upper right", frameon=False, fontsize=8)
@@ -1260,6 +1365,7 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
+  # Auto-refresh logic
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 1 minute...")
     time.sleep(60)
@@ -1268,29 +1374,8 @@ if st.session_state.get("is_running", False):
       del st.session_state["df_results"]
     st.rerun()
 else:
-  st.info("👈 Click Run Screener & Dashboard in the sidebar to fetch live data and generate the graphs.")
+  st.info(
+      "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
+      " generate the graphs."
+  )
 
-# ---------------------------------------------------------------------------
-# GOOGLE TRENDS RELATED QUERIES & TOPICS DISPLAY
-# ---------------------------------------------------------------------------
-st.markdown("---")
-with st.expander("🔍 Google Trends Data ('Therapeutics' - US, Last 1 Day)", expanded=True):
-  queries, topics = fetch_google_trends_data()
-  
-  col_q, col_t = st.columns(2)
-  
-  with col_q:
-    st.subheader("Related Queries")
-    if queries:
-      for q in queries:
-        st.markdown(f"- {q}")
-    else:
-      st.write("No related queries found.")
-      
-  with col_t:
-    st.subheader("Related Topics")
-    if topics:
-      for t in topics:
-        st.markdown(f"- {t}")
-    else:
-      st.write("No related topics found.")
