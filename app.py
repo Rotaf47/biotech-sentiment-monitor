@@ -865,29 +865,31 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_trends_data():
-  """Fetches related queries and topics using pytrends based on the specified URL parameters."""
+  """Safely fetches related queries and topics using pytrends."""
+  queries_list = []
+  topics_list = []
   try:
     pytrends = TrendReq(hl='en-US', tz=360)
-    # Mapping parameters from: https://trends.google.com/trends/explore?date=now%204-H&geo=US-MA&q=Therapeutics&hl=en-US
     pytrends.build_payload(kw_list=['Therapeutics'], geo='US-MA', timeframe='now 4-H')
-    related_data = pytrends.related_queries()
-    related_topics_data = pytrends.related_topics()
     
-    # Extract top queries dataframe
-    queries_list = []
-    if 'Therapeutics' in related_data and related_data['Therapeutics']['top'] is not None:
-      top_q_df = related_data['Therapeutics']['top']
-      queries_list = top_q_df['query'].tolist()[:10]  # Take top 10
-      
-    # Extract top topics dataframe
-    topics_list = []
-    if 'Therapeutics' in related_topics_data and related_topics_data['Therapeutics']['top'] is not None:
-      top_t_df = related_topics_data['Therapeutics']['top']
-      topics_list = top_t_df['topic_title'].tolist()[:10]  # Take top 10
+    # Safely fetch related queries
+    related_data = pytrends.related_queries()
+    if related_data and 'Therapeutics' in related_data:
+      top_q = related_data['Therapeutics'].get('top')
+      if top_q is not None and not top_q.empty and 'query' in top_q.columns:
+        queries_list = top_q['query'].tolist()[:10]
 
-    return queries_list, topics_list
+    # Safely fetch related topics
+    related_topics_data = pytrends.related_topics()
+    if related_topics_data and 'Therapeutics' in related_topics_data:
+      top_t = related_topics_data['Therapeutics'].get('top')
+      if top_t is not None and not top_t.empty and 'topic_title' in top_t.columns:
+        topics_list = top_t['topic_title'].tolist()[:10]
+
   except Exception as e:
-    return [f"Error fetching: {e}"], []
+    queries_list = [f"Error fetching: {str(e)}"]
+
+  return queries_list, topics_list
 
 
 if st.session_state.get("is_running", False):
