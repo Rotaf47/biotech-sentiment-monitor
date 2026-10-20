@@ -28,7 +28,7 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Expanded Ticker List
+# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -816,11 +816,7 @@ def fetch_ibb_data():
       cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
 
       price_5d_change = float(
-          (
-              (hist["Close"].iloc[-1] - hist["Close"].iloc[-5])
-              / hist["Close"].iloc[-5]
-          )
-          * 100
+          ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
       )
 
       if price_5d_change < 0 and cmf_5 >= 0:
@@ -866,90 +862,18 @@ def fetch_vxn_data():
   return {"status": "Error"}
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def fetch_google_trends_therapeutics():
-  """Fetches live Related Topics and Related Queries for 'Therapeutics' URL parameters
-
-  (q='Therapeutics', geo='US-MA', timeframe='now 4-H', hl='en-US').
-  """
-  default_topics = [
-      "Therapeutics (Topic)",
-      "Biotechnology (Industry)",
-      "FDA Approval (Topic)",
-      "Clinical Trial (Topic)",
-      "Gene Therapy (Topic)",
-      "mRNA Vaccines (Topic)",
-      "Pharmaceuticals (Industry)",
-      "Precision Medicine (Topic)",
-  ]
-  default_queries = [
-      "therapeutics stocks",
-      "vertex therapeutics",
-      "sarepta therapeutics",
-      "crispr therapeutics",
-      "fda approvals 2026",
-      "biotech therapeutics news",
-      "phase 3 clinical trial results",
-      "small cap biotech breakouts",
-  ]
-
-  try:
-    from pytrends.request import TrendReq
-
-    # Connect to Google Trends with en-US language settings
-    pytrends = TrendReq(hl="en-US", tz=300)
-
-    # Build payload using exact URL params: q="Therapeutics", geo="US-MA", timeframe="now 4-H"
-    pytrends.build_payload(
-        kw_list=["Therapeutics"], timeframe="now 4-H", geo="US-MA"
-    )
-
-    # Extract queries and topics
-    queries_dict = pytrends.related_queries()
-    topics_dict = pytrends.related_topics()
-
-    fetched_queries = []
-    fetched_topics = []
-
-    # Process Related Queries
-    if "Therapeutics" in queries_dict and queries_dict["Therapeutics"]:
-      q_df = queries_dict["Therapeutics"].get("top")
-      if q_df is None or q_df.empty:
-        q_df = queries_dict["Therapeutics"].get("rising")
-
-      if q_df is not None and not q_df.empty:
-        fetched_queries = q_df["query"].dropna().tolist()[:10]
-
-    # Process Related Topics
-    if "Therapeutics" in topics_dict and topics_dict["Therapeutics"]:
-      t_df = topics_dict["Therapeutics"].get("top")
-      if t_df is None or t_df.empty:
-        t_df = topics_dict["Therapeutics"].get("rising")
-
-      if t_df is not None and not t_df.empty:
-        fetched_topics = t_df["topic_title"].dropna().tolist()[:10]
-
-    final_topics = fetched_topics if fetched_topics else default_topics
-    final_queries = fetched_queries if fetched_queries else default_queries
-
-    return final_topics, final_queries
-  except Exception:
-    return default_topics, default_queries
-
-
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data & Google Trends..."):
+  with st.spinner("Fetching live market data..."):
     price_data, failed_tickers = fetch_screener_data(
         tickers, alpaca_api_key, alpaca_secret_key
     )
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
-    related_topics, related_queries = fetch_google_trends_therapeutics()
 
   results = []
   for ticker in tickers:
     overview_url = f"https://www.stocktitan.net/overview/{ticker}/"
-
+    
     if ticker not in price_data:
       results.append({
           "Ticker": ticker,
@@ -989,7 +913,9 @@ if st.session_state.get("is_running", False):
     else:
       avg_volume = 0
 
-    rvol = latest_volume / avg_volume if avg_volume > 0 else float("nan")
+    rvol = (
+        (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
+    )
 
     if previous_close == 0:
       results.append({
@@ -1028,15 +954,11 @@ if st.session_state.get("is_running", False):
   st.session_state["failed_tickers"] = failed_tickers
   st.session_state["ibb_info"] = ibb_info
   st.session_state["vxn_info"] = vxn_info
-  st.session_state["related_topics"] = related_topics
-  st.session_state["related_queries"] = related_queries
 
   df = st.session_state["df_results"]
   failed_tickers = st.session_state["failed_tickers"]
   ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
   vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
-  related_topics = st.session_state.get("related_topics", [])
-  related_queries = st.session_state.get("related_queries", [])
 
   # Metrics summary
   valid = df[df["Status"] == "OK"]
@@ -1095,11 +1017,11 @@ if st.session_state.get("is_running", False):
   # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
   # ---------------------------------------------------------------------------
   tab_macro_info, tab_dashboard = st.tabs([
-      "📈 Macro & Sector Indicators",
-      "📊 Sentiment Dashboard Visuals",
+      "📈 Macro & Sector Indicators", 
+      "📊 Sentiment Dashboard Visuals"
   ])
 
-  # SLIDE 1: MACRO INFOS SECTION
+  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1107,24 +1029,24 @@ if st.session_state.get("is_running", False):
           f"${ibb_info['price']:.2f}",
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
-
+      
       # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
       ind_col1, ind_col2 = st.columns(2)
-
-      cmf_val = ibb_info["cmf"]
-      divergence_info = ibb_info["divergence_info"]
-
+      
+      cmf_val = ibb_info['cmf']
+      divergence_info = ibb_info['divergence_info']
+      
       cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
       cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
-
+      
       with ind_col1:
         st.metric(
-            "Chaikin Money Flow (5D)",
-            f"{cmf_val:+.3f}",
-            delta=cmf_status,
-            delta_color=cmf_delta_color,
+            "Chaikin Money Flow (5D)", 
+            f"{cmf_val:+.3f}", 
+            delta=cmf_status, 
+            delta_color=cmf_delta_color
         )
-
+          
       with ind_col2:
         if "Bullish" in divergence_info:
           div_delta_color = "normal"
@@ -1132,50 +1054,40 @@ if st.session_state.get("is_running", False):
           div_delta_color = "inverse"
         else:
           div_delta_color = "off"
-
+          
         st.metric(
-            "IBB Price / CMF 5D Divergence",
-            divergence_info,
-            delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%",
-            delta_color=div_delta_color,
+            "IBB Price / CMF 5D Divergence", 
+            divergence_info, 
+            delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
+            delta_color=div_delta_color
         )
 
       # VXN Info Display under Divergence
       if vxn_info.get("status") == "OK":
-        vxn_val = vxn_info["price"]
-        vxn_change = vxn_info["change"]
-        vxn_pct = vxn_info["pct_change"]
-
+        vxn_val = vxn_info['price']
+        vxn_change = vxn_info['change']
+        vxn_pct = vxn_info['pct_change']
+        
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
-
+        
         st.metric(
             "CBOE NASDAQ Volatility Index (^VXN)",
             f"{vxn_val:.2f}",
             f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
-            delta_color=vxn_delta_color,
+            delta_color=vxn_delta_color
         )
       else:
-        st.warning(
-            "Could not fetch live CBOE NASDAQ Volatility (^VXN) data from"
-            " Yahoo Finance."
-        )
+        st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
 
+      # Rewritten Strategy Logic explanatory text
       st.markdown(
-          "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
-          " margin-bottom:15px;'>💡 <b>Strategy Logic:</b> Dynamic multi-factor"
-          " regime filter leveraging IBB sector momentum, institutional"
-          " liquidity via CMF flow, and ^VXN volatility boundaries. <b>Long"
-          " Bias:</b> Activated during positive institutional accumulation"
-          " (CMF > 0 or Bullish Divergence) combined with subdued or"
-          " downward-trending volatility (^VXN), favoring aggressive"
-          " small-to-mid cap biotech momentum plays. <b>Short/Hedge Bias:</b>"
-          " Triggered under heavy distribution (CMF < 0 or Bearish Divergence)"
-          " paired with expanding ^VXN volatility, indicating macro risk-off"
-          " pressure and favoring defensive capital preservation or tactical"
-          " short exposure. <b>Execution Filter:</b> The composite sentiment"
-          " score and breadth metrics below act as the final mandatory gateway"
-          " to filter out false breakouts before order routing.</p>",
-          unsafe_allow_html=True,
+          "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
+          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
+          "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
+          "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
+          "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
+          "</p>",
+          unsafe_allow_html=True
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
@@ -1284,9 +1196,7 @@ if st.session_state.get("is_running", False):
         ax_score.set_ylim(-0.8, 0.85)
         ax_score.set_yticks([])
         ax_score.set_xticks([-100, -60, -30, 0, 30, 60, 100])
-        ax_score.set_xlabel(
-            f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8
-        )
+        ax_score.set_xlabel(f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8)
         ax_score.text(
             0.5,
             0.94,
@@ -1455,92 +1365,6 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # ---------------------------------------------------------------------------
-  # GOOGLE TRENDS VERTICAL CAROUSELS SECTION (BOTTOM OF APPLICATION)
-  # ---------------------------------------------------------------------------
-  st.markdown("---")
-  st.subheader(
-      "🔥 Live Google Trends: 'Therapeutics' (MA, US | Past 4 Hours)"
-  )
-
-  # CSS for infinite vertical scrolling carousel
-  carousel_css = """
-    <style>
-    @keyframes scrollVertical {
-        0% { transform: translateY(0); }
-        100% { transform: translateY(-50%); }
-    }
-    .carousel-container {
-        height: 200px;
-        overflow: hidden;
-        position: relative;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 10px;
-    }
-    .carousel-track {
-        display: flex;
-        flex-direction: column;
-        animation: scrollVertical 18s linear infinite;
-    }
-    .carousel-container:hover .carousel-track {
-        animation-play-state: paused;
-    }
-    .carousel-item {
-        padding: 10px 14px;
-        margin: 5px 0;
-        background: #ffffff;
-        border-radius: 6px;
-        border-left: 4px solid #2f9e44;
-        font-size: 14px;
-        font-weight: 500;
-        color: #343a40;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    </style>
-    """
-  st.markdown(carousel_css, unsafe_allow_html=True)
-
-  # Duplicate lists to create seamless continuous scrolling loop
-  topics_html = "".join(
-      [f'<div class="carousel-item">📈 {t}</div>' for t in related_topics * 2]
-  )
-  queries_html = "".join(
-      [f'<div class="carousel-item">🔍 {q}</div>' for q in related_queries * 2]
-  )
-
-  col_t1, col_t2 = st.columns(2)
-
-  with col_t1:
-    st.markdown("**Related Topics**")
-    st.markdown(
-        f"""
-        <div class="carousel-container">
-            <div class="carousel-track">
-                {topics_html}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-  with col_t2:
-    st.markdown("**Related Queries**")
-    st.markdown(
-        f"""
-        <div class="carousel-container">
-            <div class="carousel-track">
-                {queries_html}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
   # Auto-refresh logic
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 1 minute...")
@@ -1554,3 +1378,4 @@ else:
       "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
       " generate the graphs."
   )
+
