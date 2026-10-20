@@ -860,38 +860,34 @@ def fetch_vxn_data():
           "status": "OK",
       }
   except Exception:
-      pass
+    pass
   return {"status": "Error"}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_trends_data():
-  """Fetches trends data directly for: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
+  """Bulletproof direct query scraper matching: https://trends.google.com/trends/explore?date=now%204-H&geo=US&q=Therapeutics&hl=en-US"""
   queries_list = []
   topics_list = []
   try:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    
     req_url = "https://trends.google.com/trends/api/explore?hl=en-US&tz=360&req=" + requests.utils.quote(
         json.dumps({"comparisonItem": [{"keyword": "Therapeutics", "geo": "US", "time": "now 4-H"}], "category": 0, "property": ""})
     )
-    res = requests.get(req_url, headers=headers, timeout=10)
+    res = requests.get(req_url, headers=headers, timeout=8)
     if res.status_code == 200:
       text = res.text
       if text.startswith(")]}',"):
         text = text[5:]
       data = json.loads(text)
-      
-      widgets = data.get("widgets", [])
-      for w in widgets:
+      for w in data.get("widgets", []):
         if w.get("id") == "RELATED_QUERIES":
-          q_req = w.get("request")
-          q_token = w.get("token")
+          q_req, q_token = w.get("request"), w.get("token")
           if q_token:
             sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(q_req))}&token={q_token}"
-            sub_res = requests.get(sub_url, headers=headers, timeout=10)
+            sub_res = requests.get(sub_url, headers=headers, timeout=8)
             if sub_res.status_code == 200:
               sub_text = sub_res.text
               if sub_text.startswith(")]}',"):
@@ -901,13 +897,11 @@ def fetch_google_trends_data():
                 for kw in item.get("rankedKeyword", [])[:10]:
                   if "query" in kw:
                     queries_list.append(kw["query"])
-
         elif w.get("id") == "RELATED_TOPICS":
-          t_req = w.get("request")
-          t_token = w.get("token")
+          t_req, t_token = w.get("request"), w.get("token")
           if t_token:
             sub_url = f"https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=360&req={requests.utils.quote(json.dumps(t_req))}&token={t_token}"
-            sub_res = requests.get(sub_url, headers=headers, timeout=10)
+            sub_res = requests.get(sub_url, headers=headers, timeout=8)
             if sub_res.status_code == 200:
               sub_text = sub_res.text
               if sub_text.startswith(")]}',"):
@@ -917,14 +911,14 @@ def fetch_google_trends_data():
                 for kw in item.get("rankedKeyword", [])[:10]:
                   if "topic" in kw and "title" in kw["topic"]:
                     topics_list.append(kw["topic"]["title"])
-
-  except Exception as e:
+  except Exception:
     pass
 
+  # Safe fallbacks if empty or rate-limited
   if not queries_list:
-    queries_list = ["No related queries found for this short timeframe (now 4-H)."]
+    queries_list = ["No trending queries available for the 4-hour window."]
   if not topics_list:
-    topics_list = ["No related topics found for this short timeframe (now 4-H)."]
+    topics_list = ["No trending topics available for the 4-hour window."]
 
   return queries_list[:10], topics_list[:10]
 
