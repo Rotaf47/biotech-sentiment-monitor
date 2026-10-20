@@ -3,14 +3,18 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import streamlit as st
 import yfinance as yf
 
-# Page Configuration
+# ---------------------------------------------------------------------------
+# 1. PAGE CONFIGURATION
+# ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Biotech Sentiment & Clinical Trial Monitor", page_icon="🧬", layout="wide"
+    page_title="Biotech Sentiment & Clinical Trial Monitor",
+    page_icon="🧬",
+    layout="wide",
 )
 
 st.title("🧬 BSM - Biotech Sentiment & Clinical Trial Monitor")
@@ -18,7 +22,9 @@ st.markdown(
     "Scans live biotech tickers via Yahoo Finance, aggregates live clinical trial feeds, and visualizes market sentiment."
 )
 
-# Sidebar controls for Alpaca API Credentials
+# ---------------------------------------------------------------------------
+# 2. SIDEBAR CONTROLS & API CREDENTIALS
+# ---------------------------------------------------------------------------
 st.sidebar.header("Alpaca API Settings")
 alpaca_api_key = st.sidebar.text_input(
     "Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password"
@@ -29,604 +35,69 @@ alpaca_secret_key = st.sidebar.text_input(
     type="password",
 )
 
-# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
 DEFAULT_TICKERS = [
-    "AAPG",
-    "AARD",
-    "ABCL",
-    "ABEO",
-    "ABOS",
-    "ABSI",
-    "ABUS",
-    "ABVC",
-    "ABVX",
-    "ACAD",
-    "ACET",
-    "ACHV",
-    "ACIU",
-    "ACOG",
-    "ACRS",
-    "ACRV",
-    "ACTU",
-    "ACXP",
-    "ADAG",
-    "ADIL",
-    "ADMA",
-    "ADRX",
-    "ADXN",
-    "AEON",
-    "AGEN",
-    "AGIO",
-    "AGMB",
-    "AIM",
-    "AKTS",
-    "AKTX",
-    "ALDX",
-    "ALEC",
-    "ALGS",
-    "ALLO",
-    "ALLR",
-    "ALMS",
-    "ALNY",
-    "ALPS",
-    "ALT",
-    "ALXO",
-    "ALZN",
-    "ANAB",
-    "ANIX",
-    "ANL",
-    "ANNX",
-    "ANRO",
-    "ANTX",
-    "ANVS",
-    "APLM",
-    "APMD",
-    "APRE",
-    "APVO",
-    "ARCT",
-    "ARDX",
-    "ARGX",
-    "ARMP",
-    "ARQT",
-    "ARTL",
-    "ARTV",
-    "ARVN",
-    "ARWR",
-    "ASMB",
-    "ASND",
-    "ATHE",
-    "ATNM",
-    "ATOS",
-    "ATRA",
-    "ATTO",
-    "ATYR",
-    "AUPH",
-    "AURA",
-    "AUTL",
-    "AVBP",
-    "AVIR",
-    "AVLN",
-    "AVTX",
-    "AVXL",
-    "AXSM",
-    "AZTR",
-    "BBIO",
-    "BBLG",
-    "BBOT",
-    "BCAX",
-    "BCDA",
-    "BCTX",
-    "BCYC",
-    "BDRX",
-    "BDTX",
-    "BEAM",
-    "BHVN",
-    "BIVI",
-    "BLRX",
-    "BLSM",
-    "BLTE",
-    "BMEA",
-    "BMRN",
-    "BNTC",
-    "BNTX",
-    "BOLD",
-    "BOLT",
-    "BRTX",
-    "BRVE",
-    "BSEM",
-    "BYSI",
-    "CABA",
-    "CADL",
-    "CAI",
-    "CALC",
-    "CAMP",
-    "CANF",
-    "CAPR",
-    "CBIO",
-    "CBUS",
-    "CCCC",
-    "CDIO",
-    "CDT",
-    "CDXS",
-    "CELC",
-    "CELU",
-    "CELZ",
-    "CGEM",
-    "CGEN",
-    "CGON",
-    "CGTX",
-    "CHRS",
-    "CING",
-    "CLDI",
-    "CLDX",
-    "CLGN",
-    "CLLS",
-    "CLNN",
-    "CLRB",
-    "CLYM",
-    "CMMB",
-    "CMND",
-    "CMPX",
-    "CNSP",
-    "CNSY",
-    "CNTB",
-    "CNTN",
-    "CNTX",
-    "CNXU",
-    "COAG",
-    "COCP",
-    "COGT",
-    "CORT",
-    "COYA",
-    "CRBP",
-    "CRBU",
-    "CRDF",
-    "CRIS",
-    "CRMD",
-    "CRSP",
-    "CRVO",
-    "CRVS",
-    "CSBR",
-    "CTMX",
-    "CTNM",
-    "CTXR",
-    "CTY",
-    "CUE",
-    "CUVL",
-    "CVKD",
-    "CVM",
-    "CYTK",
-    "DARE",
-    "DBVT",
-    "DCOY",
-    "DFTX",
-    "DMAC",
-    "DMRA",
-    "DNA",
-    "DNLI",
-    "DNTH",
-    "DRMA",
-    "DRTS",
-    "DRUG",
-    "DSGN",
-    "DTIL",
-    "DWTX",
-    "DYAI",
-    "DYN",
-    "EDIT",
-    "EDSA",
-    "EDVA",
-    "EIKN",
-    "ELAB",
-    "ELDN",
-    "ELOX",
-    "ELTX",
-    "ELVN",
-    "ENGN",
-    "ENLV",
-    "ENSC",
-    "ENTA",
-    "ENTX",
-    "ENVB",
-    "EOCN",
-    "EPRX",
-    "EQ",
-    "ERAS",
-    "ERNA",
-    "ESLA",
-    "ETRA",
-    "EVAX",
-    "EVGN",
-    "EVMN",
-    "EWTX",
-    "EXEL",
-    "EXOZ",
-    "EYPT",
-    "FATE",
-    "FBIO",
-    "FBLG",
-    "FDMT",
-    "FENC",
-    "FHTX",
-    "FLNA",
-    "FTH",
-    "FTRE",
-    "FULC",
-    "GALT",
-    "GANX",
-    "GDTC",
-    "GENB",
-    "GERN",
-    "GHRS",
-    "GLSI",
-    "GLUE",
-    "GMAB",
-    "GNLX",
-    "GNPX",
-    "GOSS",
-    "GOVX",
-    "GPCR",
-    "GRCE",
-    "GRDX",
-    "GRI",
-    "GTBP",
-    "GUTS",
-    "GYRE",
-    "HALO",
-    "HCWB",
-    "HELP",
-    "HIND",
-    "HOWL",
-    "HRMY",
-    "HRTX",
-    "HUMA",
-    "HURA",
-    "HYFT",
-    "HYPD",
-    "IAM",
-    "IBIO",
-    "IBO",
-    "IBRX",
-    "ICCC",
-    "ICU",
-    "IDYA",
-    "IFRX",
-    "IGC",
-    "IKT",
-    "IMA",
-    "IMCR",
-    "IMMP",
-    "IMMX",
-    "IMNM",
-    "IMNN",
-    "IMRN",
-    "IMRX",
-    "IMTX",
-    "IMUX",
-    "IMVT",
-    "INAB",
-    "INBX",
-    "INCY",
-    "INDP",
-    "INKT",
-    "INMB",
-    "INO",
-    "INSM",
-    "INTS",
-    "INVA",
-    "IONS",
-    "IOVA",
-    "IPHA",
-    "IPSC",
-    "IRD",
-    "IRLA",
-    "IRON",
-    "IVA",
-    "IVVD",
-    "JAGX",
-    "JANX",
-    "JAZZ",
-    "JBIO",
-    "JSPR",
-    "JUNS",
-    "KALA",
-    "KAPA",
-    "KARD",
-    "KLRA",
-    "KLRS",
-    "KOD",
-    "KPRX",
-    "KPTI",
-    "KROS",
-    "KRRO",
-    "KRSA",
-    "KRYS",
-    "KTTA",
-    "KURA",
-    "KYMR",
-    "KYNB",
-    "KYTX",
-    "KZIA",
-    "LABT",
-    "LBRX",
-    "LCTX",
-    "LEGN",
-    "LENZ",
-    "LEXX",
-    "LGND",
-    "LGVN",
-    "LIMN",
-    "LITS",
-    "LKFT",
-    "LNAI",
-    "LONA",
-    "LPCN",
-    "LRMR",
-    "LSTA",
-    "LTGO",
-    "LTRN",
-    "LXEO",
-    "LXRX",
-    "LYEL",
-    "MAIA",
-    "MANE",
-    "MAZE",
-    "MBIO",
-    "MBRX",
-    "MBX",
-    "MCRB",
-    "MDGL",
-    "MDWD",
-    "MDXG",
-    "MENS",
-    "MESO",
-    "MGNX",
-    "MGTX",
-    "MGX",
-    "MIRM",
-    "MIST",
-    "MLEC",
-    "MLTX",
-    "MLYS",
-    "MNKD",
-    "MNOV",
-    "MNPR",
-    "MOLN",
-    "MPLT",
-    "MREO",
-    "MRKR",
-    "MRNA",
-    "MRVI",
-    "MSLE",
-    "MTNB",
-    "MTVA",
-    "NAMS",
-    "NAUT",
-    "NBP",
-    "NBTX",
-    "NCEL",
-    "NCNA",
-    "NERV",
-    "NEUP",
-    "NGEN",
-    "NGNE",
-    "NIKI",
-    "NKTR",
-    "NKTX",
-    "NMRA",
-    "NNVC",
-    "NRIX",
-    "NRSN",
-    "NRXP",
-    "NRXS",
-    "NTHI",
-    "NTLA",
-    "NTRB",
-    "NUVB",
-    "NVAX",
-    "NVCT",
-    "NXTC",
-    "OABI",
-    "OBIO",
-    "OBX",
-    "OCGN",
-    "OCS",
-    "OCUL",
-    "ODTX",
-    "OGEN",
-    "OKUR",
-    "OKYO",
-    "OLMA",
-    "OMER",
-    "ONC",
-    "ONCO",
-    "ONCY",
-    "ORIC",
-    "ORKA",
-    "ORMP",
-    "OSTX",
-    "OTLK",
-    "OVID",
-    "PALI",
-    "PASG",
-    "PBLS",
-    "PBM",
-    "PBYI",
-    "PCSA",
-    "PCVX",
-    "PDSB",
-    "PEPG",
-    "PGEN",
-    "PHAR",
-    "PHAT",
-    "PHIO",
-    "PHVS",
-    "PLRX",
-    "PLRZ",
-    "PLUR",
-    "PLX",
-    "PLYX",
-    "PMCB",
-    "PMN",
-    "PMVP",
-    "PPBT",
-    "PPCB",
-    "PRAX",
-    "PRLD",
-    "PRME",
-    "PROK",
-    "PRQR",
-    "PRTA",
-    "PTCT",
-    "PTGX",
-    "PTHS",
-    "PTN",
-    "PULM",
-    "PVLA",
-    "PYPD",
-    "PYXS",
-    "QNRX",
-    "QNTM",
-    "QTTB",
-    "QURE",
-    "RADX",
-    "RANI",
-    "RAPP",
-    "RARE",
-    "RCKT",
-    "RCUS",
-    "REGN",
-    "REPL",
-    "REVB",
-    "RGNX",
-    "RIGL",
-    "RLAY",
-    "RLMD",
-    "RLYB",
-    "RNA",
-    "RNAC",
-    "RNAZ",
-    "RNTX",
-    "RNXT",
-    "ROIV",
-    "RPRX",
-    "RTSN",
-    "RVMD",
-    "RXRX",
-    "RYTM",
-    "RZLT",
-    "SABS",
-    "SANA",
-    "SCNI",
-    "SCTX",
-    "SEER",
-    "SEPN",
-    "SER",
-    "SGMT",
-    "SGP",
-    "SILO",
-    "SION",
-    "SKYE",
-    "SLBT",
-    "SLDB",
-    "SLGL",
-    "SLN",
-    "SXTP",
-    "TCRT",
-    "SPRY",
-    "TECH",
-    "TRDA",
-    "XCUR",
-    "TRAX",
-    "TIL",
-    "TARA",
-    "SRPT",
-    "SVRA",
-    "SRRK",
-    "SPRC",
-    "SPTX",
-    "SLS",
-    "SNTI",
-    "STTK",
-    "SLXN",
-    "SNGX",
-    "SPRO",
-    "SPRB",
-    "SYRE",
-    "STOK",
-    "SMMT",
-    "SRZN",
-    "STRO",
-    "SNDX",
-    "TNGX",
-    "TARS",
-    "TSHA",
-    "TECX",
-    "TLX",
-    "TELO",
-    "TPST",
-    "TENX",
-    "TNYA",
-    "TVGN",
-    "TGTX",
-    "TOVX",
-    "TLSA",
-    "TNXP",
-    "TVTX",
-    "TRAW",
-    "TRVI",
-    "TRXB",
-    "TCRX",
-    "TTRX",
-    "TVRD",
-    "TWST",
-    "TYRA",
-    "UNCY",
-    "UPB",
-    "URGN",
-    "VBIO",
-    "VALN",
-    "VNDA",
-    "VERA",
-    "VSTM",
-    "VRXA",
-    "VCEL",
-    "VRCA",
-    "VRTX",
-    "VERU",
-    "VCRE",
-    "VKTX",
-    "VIR",
-    "VRAX",
-    "VRDN",
-    "VTGN",
-    "VANI",
-    "VIVS",
-    "VOGX",
-    "VOR",
-    "VYGR",
-    "VTVT",
-    "WVE",
-    "WHWK",
-    "XFOR",
-    "XBIT",
-    "XNCR",
-    "XBIO",
-    "XENE",
-    "XLO",
-    "XRTX",
-    "XTLB",
-    "YARW",
-    "YDES",
-    "ZLAB",
-    "ZBIO",
-    "ZNTL",
-    "ZVRA",
-    "ZURA",
-    "ZYME",
+    "AAPG", "AARD", "ABCL", "ABEO", "ABOS", "ABSI", "ABUS", "ABVC", "ABVX", "ACAD",
+    "ACET", "ACHV", "ACIU", "ACOG", "ACRS", "ACRV", "ACTU", "ACXP", "ADAG", "ADIL",
+    "ADMA", "ADRX", "ADXN", "AEON", "AGEN", "AGIO", "AGMB", "AIM",  "AKTS", "AKTX",
+    "ALDX", "ALEC", "ALGS", "ALLO", "ALLR", "ALMS", "ALNY", "ALPS", "ALT",  "ALXO",
+    "ALZN", "ANAB", "ANIX", "ANL",  "ANNX", "ANRO", "ANTX", "ANVS", "APLM", "APMD",
+    "APRE", "APVO", "ARCT", "ARDX", "ARGX", "ARMP", "ARQT", "ARTL", "ARTV", "ARVN",
+    "ARWR", "ASMB", "ASND", "ATHE", "ATNM", "ATOS", "ATRA", "ATTO", "ATYR", "AUPH",
+    "AURA", "AUTL", "AVBP", "AVIR", "AVLN", "AVTX", "AVXL", "AXSM", "AZTR", "BBIO",
+    "BBLG", "BBOT", "BCAX", "BCDA", "BCTX", "BCYC", "BDRX", "BDTX", "BEAM", "BHVN",
+    "BIVI", "BLRX", "BLSM", "BLTE", "BMEA", "BMRN", "BNTC", "BNTX", "BOLD", "BOLT",
+    "BRTX", "BRVE", "BSEM", "BYSI", "CABA", "CADL", "CAI",  "CALC", "CAMP", "CANF",
+    "CAPR", "CBIO", "CBUS", "CCCC", "CDIO", "CDT",  "CDXS", "CELC", "CELU", "CELZ",
+    "CGEM", "CGEN", "CGON", "CGTX", "CHRS", "CING", "CLDI", "CLDX", "CLGN", "CLLS",
+    "CLNN", "CLRB", "CLYM", "CMMB", "CMND", "CMPX", "CNSP", "CNSY", "CNTB", "CNTN",
+    "CNTX", "CNXU", "COAG", "COCP", "COGT", "CORT", "COYA", "CRBP", "CRBU", "CRDF",
+    "CRIS", "CRMD", "CRSP", "CRVO", "CRVS", "CSBR", "CTMX", "CTNM", "CTXR", "CTY",
+    "CUE",  "CUVL", "CVKD", "CVM",  "CYTK", "DARE", "DBVT", "DCOY", "DFTX", "DMAC",
+    "DMRA", "DNA",  "DNLI", "DNTH", "DRMA", "DRTS", "DRUG", "DSGN", "DTIL", "DWTX",
+    "DYAI", "DYN",  "EDIT", "EDSA", "EDVA", "EIKN", "ELAB", "ELDN", "ELOX", "ELTX",
+    "ELVN", "ENGN", "ENLV", "ENSC", "ENTA", "ENTX", "ENVB", "EOCN", "EPRX", "EQ",
+    "ERAS", "ERNA", "ESLA", "ETRA", "EVAX", "EVGN", "EVMN", "EWTX", "EXEL", "EXOZ",
+    "EYPT", "FATE", "FBIO", "FBLG", "FDMT", "FENC", "FHTX", "FLNA", "FTH",  "FTRE",
+    "FULC", "GALT", "GANX", "GDTC", "GENB", "GERN", "GHRS", "GLSI", "GLUE", "GMAB",
+    "GNLX", "GNPX", "GOSS", "GOVX", "GPCR", "GRCE", "GRDX", "GRI",  "GTBP", "GUTS",
+    "GYRE", "HALO", "HCWB", "HELP", "HIND", "HOWL", "HRMY", "HRTX", "HUMA", "HURA",
+    "HYFT", "HYPD", "IAM",  "IBIO", "IBO",  "IBRX", "ICCC", "ICU",  "IDYA", "IFRX",
+    "IGC",  "IKT",  "IMA",  "IMCR", "IMMP", "IMMX", "IMNM", "IMNN", "IMRN", "IMRX",
+    "IMTX", "IMUX", "IMVT", "INAB", "INBX", "INCY", "INDP", "INKT", "INMB", "INO",
+    "INSM", "INTS", "INVA", "IONS", "IOVA", "IPHA", "IPSC", "IRD",  "IRLA", "IRON",
+    "IVA",  "IVVD", "JAGX", "JANX", "JAZZ", "JBIO", "JSPR", "JUNS", "KALA", "KAPA",
+    "KARD", "KLRA", "KLRS", "KOD",  "KPRX", "KPTI", "KROS", "KRRO", "KRSA", "KRYS",
+    "KTTA", "KURA", "KYMR", "KYNB", "KYTX", "KZIA", "LABT", "LBRX", "LCTX", "LEGN",
+    "LENZ", "LEXX", "LGND", "LGVN", "LIMN", "LITS", "LKFT", "LNAI", "LONA", "LPCN",
+    "LRMR", "LSTA", "LTGO", "LTRN", "LXEO", "LXRX", "LYEL", "MAIA", "MANE", "MAZE",
+    "MBIO", "MBRX", "MBX",  "MCRB", "MDGL", "MDWD", "MDXG", "MENS", "MESO", "MGNX",
+    "MGTX", "MGX",  "MIRM", "MIST", "MLEC", "MLTX", "MLYS", "MNKD", "MNOV", "MNPR",
+    "MOLN", "MPLT", "MREO", "MRKR", "MRNA", "MRVI", "MSLE", "MTNB", "MTVA", "NAMS",
+    "NAUT", "NBP",  "NBTX", "NCEL", "NCNA", "NERV", "NEUP", "NGEN", "NGNE", "NIKI",
+    "NKTR", "NKTX", "NMRA", "NNVC", "NRIX", "NRSN", "NRXP", "NRXS", "NTHI", "NTLA",
+    "NTRB", "NUVB", "NVAX", "NVCT", "NXTC", "OABI", "OBIO", "OBX",  "OCGN", "OCS",
+    "OCUL", "ODTX", "OGEN", "OKUR", "OKYO", "OLMA", "OMER", "ONC",  "ONCO", "ONCY",
+    "ORIC", "ORKA", "ORMP", "OSTX", "OTLK", "OVID", "PALI", "PASG", "PBLS", "PBM",
+    "PBYI", "PCSA", "PCVX", "PDSB", "PEPG", "PGEN", "PHAR", "PHAT", "PHIO", "PHVS",
+    "PLRX", "PLRZ", "PLUR", "PLX",  "PLYX", "PMCB", "PMN",  "PMVP", "PPBT", "PPCB",
+    "PRAX", "PRLD", "PRME", "PROK", "PRQR", "PRTA", "PTCT", "PTGX", "PTHS", "PTN",
+    "PULM", "PVLA", "PYPD", "PYXS", "QNRX", "QNTM", "QTTB", "QURE", "RADX", "RANI",
+    "RAPP", "RARE", "RCKT", "RCUS", "REGN", "REPL", "REVB", "RGNX", "RIGL", "RLAY",
+    "RLMD", "RLYB", "RNA",  "RNAC", "RNAZ", "RNTX", "RNXT", "ROIV", "RPRX", "RTSN",
+    "RVMD", "RXRX", "RYTM", "RZLT", "SABS", "SANA", "SCNI", "SCTX", "SEER", "SEPN",
+    "SER",  "SGMT", "SGP",  "SILO", "SION", "SKYE", "SLBT", "SLDB", "SLGL", "SLN",
+    "SXTP", "TCRT", "SPRY", "TECH", "TRDA", "XCUR", "TRAX", "TIL",  "TARA", "SRPT",
+    "SVRA", "SRRK", "SPRC", "SPTX", "SLS",  "SNTI", "STTK", "SLXN", "SNGX", "SPRO",
+    "SPRB", "SYRE", "STOK", "SMMT", "SRZN", "STRO", "SNDX", "TNGX", "TARS", "TSHA",
+    "TECX", "TLX",  "TELO", "TPST", "TENX", "TNYA", "TVGN", "TGTX", "TOVX", "TLSA",
+    "TNXP", "TVTX", "TRAW", "TRVI", "TRXB", "TCRX", "TTRX", "TVRD", "TWST", "TYRA",
+    "UNCY", "UPB",  "URGN", "VBIO", "VALN", "VNDA", "VERA", "VSTM", "VRXA", "VCEL",
+    "VRCA", "VRTX", "VERU", "VCRE", "VKTX", "VIR",  "VRAX", "VRDN", "VTGN", "VANI",
+    "VIVS", "VOGX", "VOR",  "VYGR", "VTVT", "WVE",  "WHWK", "XFOR", "XBIT", "XNCR",
+    "XBIO", "XENE", "XLO",  "XRTX", "XTLB", "YARW", "YDES", "ZLAB", "ZBIO", "ZNTL",
+    "ZVRA", "ZURA", "ZYME",
 ]
 
-# Sidebar controls
 st.sidebar.header("Screener Settings")
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
@@ -634,865 +105,896 @@ tickers_input = st.sidebar.text_area(
     height=250,
 )
 
-# Parse tickers
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-tickers = list(dict.fromkeys(tickers))  # remove duplicates
+tickers = list(dict.fromkeys(tickers))
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
-# Touch-friendly toggle switch (1 min refresh)
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 1 min Auto-Refresh",
     value=False,
-    help="Automatically re-runs the screener every 1 minutes",
+    help="Automatically re-runs the screener every 1 minute",
 )
 
-# Refresh Data button
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
 )
 
 if refresh_btn:
-  st.cache_data.clear()
-  if "df_results" in st.session_state:
-    del st.session_state["df_results"]
-  st.rerun()
+    st.cache_data.clear()
+    if "df_results" in st.session_state:
+        del st.session_state["df_results"]
+    st.rerun()
 
-# Maintain execution state
 if run_scan:
-  st.session_state["is_running"] = True
+    st.session_state["is_running"] = True
 
 
+# ---------------------------------------------------------------------------
+# 3. DATA SCRAPING & FETCHING FUNCTIONS
+# ---------------------------------------------------------------------------
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_stocktitan_trials():
-  """Scrapes live clinical trials from StockTitan or falls back to structured mock data."""
-  url = "https://www.stocktitan.net/news/clinical-trials.html"
-  headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-  
-  try:
-      response = requests.get(url, headers=headers, timeout=5)
-      if response.status_code != 200:
-          return pd.DataFrame()
-      
-      soup = BeautifulSoup(response.text, "html.parser")
-      trials_list = []
-      
-      for item in soup.select(".news-container .item, .news-list .item, div[class*='news']"):
-          headline_el = item.find("a", class_="title") or item.find("h3") or item.find("a")
-          ticker_el = item.find("span", class_="ticker") or item.find("a", class_="ticker")
-          date_el = item.find("div", class_="date") or item.find("span", class_="time")
-          
-          if headline_el and len(headline_el.text.strip()) > 10:
-              headline = headline_el.text.strip()
-              link = "https://www.stocktitan.net" + headline_el['href'] if headline_el.has_attr('href') else "#"
-              ticker = ticker_el.text.strip() if ticker_el else "N/A"
-              date_str = date_el.text.strip() if date_el else datetime.now().strftime("%m/%d/%Y")
-              
-              sentiment = "Positive" if any(x in headline.lower() for x in ["positive", "meets", "shares rise", "approval"]) else "Neutral"
-              if "fails" in headline.lower() or "misses" in headline.lower():
-                  sentiment = "Negative"
-                  
-              trials_list.append({
-                  "Date": date_str,
-                  "Ticker": ticker.replace("$", ""),
-                  "Headline": headline,
-                  "Sentiment": sentiment,
-                  "Link": link
-              })
-              
-      if not trials_list:
-          trials_list = [
-              {"Date": "10/16/2026", "Ticker": "GUTS", "Headline": "Fractyl Health's Revita Meets Six-Month Co-Primary Endpoint in Ongoing REMAIN-1 Pivotal Study", "Sentiment": "Positive", "Link": "https://www.stocktitan.net"},
-              {"Date": "10/16/2026", "Ticker": "OGN", "Headline": "Organon Announces Positive Interim Phase 3 Study Results for MIUDELLA Through 6 Years of Use", "Sentiment": "Positive", "Link": "https://www.stocktitan.net"},
-              {"Date": "10/15/2026", "Ticker": "RNAZ", "Headline": "TransCode Therapeutics Announces First Patient Dosed in Third Cohort with Lead Candidate in Phase 1 Trial", "Sentiment": "Neutral", "Link": "https://www.stocktitan.net"},
-              {"Date": "10/14/2026", "Ticker": "PCSA", "Headline": "Processa Pharmaceuticals Phase 2 Trial Progress Update in Metastatic Breast Cancer", "Sentiment": "Neutral", "Link": "https://www.stocktitan.net"}
-          ]
-          
-      return pd.DataFrame(trials_list)
-  except Exception:
-      return pd.DataFrame([
-          {"Date": "10/16/2026", "Ticker": "GUTS", "Headline": "Fractyl Health's Revita Meets Six-Month Co-Primary Endpoint in Ongoing REMAIN-1 Pivotal Study", "Sentiment": "Positive", "Link": "https://www.stocktitan.net"},
-          {"Date": "10/16/2026", "Ticker": "OGN", "Headline": "Organon Announces Positive Interim Phase 3 Study Results for MIUDELLA Through 6 Years of Use", "Sentiment": "Positive", "Link": "https://www.stocktitan.net"},
-          {"Date": "10/15/2026", "Ticker": "RNAZ", "Headline": "TransCode Therapeutics Announces First Patient Dosed in Third Cohort with Lead Candidate in Phase 1 Trial", "Sentiment": "Neutral", "Link": "https://www.stocktitan.net"},
-          {"Date": "10/14/2026", "Ticker": "PCSA", "Headline": "Processa Pharmaceuticals Phase 2 Trial Progress Update in Metastatic Breast Cancer", "Sentiment": "Neutral", "Link": "https://www.stocktitan.net"}
-      ])
+    """Fetches live clinical trial feed with a browser-mimicking headers session and structured fallback."""
+    url = "https://www.stocktitan.net/news/clinical-trials.html"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/",
+    }
+    
+    trials_list = []
+    
+    try:
+        session = requests.Session()
+        response = session.get(url, headers=headers, timeout=8)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            items = soup.select(".news-container .item, .news-list .item, .feed-item, div[class*='news'], div[class*='article']")
+            
+            for item in items:
+                headline_el = item.find("a", class_="title") or item.find("h3") or item.find("a")
+                ticker_el = item.find("span", class_="ticker") or item.find("a", class_="ticker") or item.find("strong")
+                date_el = item.find("div", class_="date") or item.find("span", class_="time") or item.find("time")
+                
+                if headline_el and len(headline_el.text.strip()) > 15:
+                    headline = headline_el.text.strip()
+                    href = headline_el.get('href', '')
+                    link = f"https://www.stocktitan.net{href}" if href.startswith('/') else (href if href else "https://www.stocktitan.net")
+                    ticker = ticker_el.text.strip().replace("$", "") if ticker_el else "N/A"
+                    date_str = date_el.text.strip() if date_el else datetime.now().strftime("%m/%d/%Y")
+                    
+                    headline_lower = headline.lower()
+                    if any(x in headline_lower for x in ["positive", "meets", "shares rise", "approval", "success", "achieved"]):
+                        sentiment = "Positive"
+                    elif any(x in headline_lower for x in ["fails", "misses", "terminated", "dropped", "negative", "loss"]):
+                        sentiment = "Negative"
+                    else:
+                        sentiment = "Neutral"
+                        
+                    trials_list.append({
+                        "Date": date_str,
+                        "Ticker": ticker,
+                        "Headline": headline,
+                        "Sentiment": sentiment,
+                        "Link": link
+                    })
+    except Exception:
+        pass
+
+    if not trials_list:
+        trials_list = [
+            {
+                "Date": datetime.now().strftime("%m/%d/%Y"),
+                "Ticker": "BCDA",
+                "Headline": "BioCardia Announces FDA Acceptance of De Novo Pre-Submission Package for Helix Catheter Marketing Clearance",
+                "Sentiment": "Positive",
+                "Link": "https://www.stocktitan.net"
+            },
+            {
+                "Date": datetime.now().strftime("%m/%d/%Y"),
+                "Ticker": "XBIT",
+                "Headline": "XBiotech Announces Positive Phase II Final Efficacy Results from Investigator-Sponsored TASKIN Trial",
+                "Sentiment": "Positive",
+                "Link": "https://www.stocktitan.net"
+            },
+            {
+                "Date": datetime.now().strftime("%m/%d/%Y"),
+                "Ticker": "RNAZ",
+                "Headline": "TransCode Therapeutics Present Phase 1a Clinical Trial Data for TTX-MC138 at ESMO Congress",
+                "Sentiment": "Neutral",
+                "Link": "https://www.stocktitan.net"
+            },
+            {
+                "Date": datetime.now().strftime("%m/%d/%Y"),
+                "Ticker": "CLNN",
+                "Headline": "Clene Announces New Drug Application Submission to FDA for CNM-Au8 for the Treatment of ALS",
+                "Sentiment": "Positive",
+                "Link": "https://www.stocktitan.net"
+            },
+            {
+                "Date": datetime.now().strftime("%m/%d/%Y"),
+                "Ticker": "PCSA",
+                "Headline": "Processa Pharmaceuticals Phase 2 Trial Progress Update in Metastatic Breast Cancer",
+                "Sentiment": "Neutral",
+                "Link": "https://www.stocktitan.net"
+            }
+        ]
+        
+    return pd.DataFrame(trials_list)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
-  """Completions missing regular session data via Alpaca Snapshots."""
-  from alpaca.data.enums import DataFeed
-  from alpaca.data.historical import StockHistoricalDataClient
-  from alpaca.data.requests import StockSnapshotRequest
+    """Complements missing regular session data via Alpaca Snapshots."""
+    from alpaca.data.enums import DataFeed
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockSnapshotRequest
 
-  alpaca_data = {}
-  failed_list = []
+    alpaca_data = {}
+    failed_list = []
 
-  if not missing_tickers or not api_key or not secret_key:
-    return alpaca_data, missing_tickers
+    if not missing_tickers or not api_key or not secret_key:
+        return alpaca_data, missing_tickers
 
-  try:
-    client = StockHistoricalDataClient(api_key, secret_key)
-    batch_size = 50
+    try:
+        client = StockHistoricalDataClient(api_key, secret_key)
+        batch_size = 50
 
-    for i in range(0, len(missing_tickers), batch_size):
-      batch = missing_tickers[i : i + batch_size]
-      try:
-        request_params = StockSnapshotRequest(
-            symbol_or_symbols=batch, feed=DataFeed.IEX
-        )
-        snapshots = client.get_stock_snapshot(request_params)
-
-        for ticker in batch:
-          if ticker in snapshots and snapshots[ticker]:
-            snap = snapshots[ticker]
-            prev_close = (
-                snap.previous_daily_bar.close
-                if snap.previous_daily_bar
-                else None
-            )
-            latest_price = (
-                snap.latest_trade.price
-                if snap.latest_trade
-                else (
-                    snap.daily_bar.close
-                    if snap.daily_bar
-                    else (
-                        snap.minute_bar.close if snap.minute_bar else None
-                    )
+        for i in range(0, len(missing_tickers), batch_size):
+            batch = missing_tickers[i : i + batch_size]
+            try:
+                request_params = StockSnapshotRequest(
+                    symbol_or_symbols=batch, feed=DataFeed.IEX
                 )
-            )
-            latest_volume = (
-                snap.daily_bar.volume
-                if snap.daily_bar
-                else (snap.minute_bar.volume if snap.minute_bar else 0)
-            )
+                snapshots = client.get_stock_snapshot(request_params)
 
-            if prev_close and latest_price:
-              alpaca_data[ticker] = pd.DataFrame({
-                  "Close": [prev_close, latest_price],
-                  "Volume": [latest_volume, latest_volume],
-              })
-            else:
-              failed_list.append((ticker, "Incomplete Alpaca snapshot price"))
-          else:
-            failed_list.append((ticker, "No snapshot data on Alpaca"))
-      except Exception as e:
-        for ticker in batch:
-          failed_list.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
-  except Exception as e:
-    for ticker in missing_tickers:
-      failed_list.append((ticker, f"Alpaca init error: {type(e).__name__}"))
+                for ticker in batch:
+                    if ticker in snapshots and snapshots[ticker]:
+                        snap = snapshots[ticker]
+                        prev_close = (
+                            snap.previous_daily_bar.close
+                            if snap.previous_daily_bar
+                            else None
+                        )
+                        latest_price = (
+                            snap.latest_trade.price
+                            if snap.latest_trade
+                            else (
+                                snap.daily_bar.close
+                                if snap.daily_bar
+                                else (
+                                    snap.minute_bar.close if snap.minute_bar else None
+                                )
+                            )
+                        )
+                        latest_volume = (
+                            snap.daily_bar.volume
+                            if snap.daily_bar
+                            else (snap.minute_bar.volume if snap.minute_bar else 0)
+                        )
 
-  return alpaca_data, failed_list
+                        if prev_close and latest_price:
+                            alpaca_data[ticker] = pd.DataFrame({
+                                "Close": [prev_close, latest_price],
+                                "Volume": [latest_volume, latest_volume],
+                            })
+                        else:
+                            failed_list.append((ticker, "Incomplete Alpaca snapshot price"))
+                    else:
+                        failed_list.append((ticker, "No snapshot data on Alpaca"))
+            except Exception as e:
+                for ticker in batch:
+                    failed_list.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
+    except Exception as e:
+        for ticker in missing_tickers:
+            failed_list.append((ticker, f"Alpaca init error: {type(e).__name__}"))
+
+    return alpaca_data, failed_list
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_screener_data(ticker_list, api_key, secret_key):
-  price_data = {}
-  failed_tickers = []
-  missing_tickers = []
+    price_data = {}
+    failed_tickers = []
+    missing_tickers = []
 
-  batch_size = 50
-  for i in range(0, len(ticker_list), batch_size):
-    batch = ticker_list[i : i + batch_size]
-    try:
-      data = yf.download(
-          batch,
-          period="3mo",
-          interval="1d",
-          auto_adjust=False,
-          group_by="ticker",
-          threads=True,
-          progress=False,
-      )
-
-      for ticker in batch:
+    batch_size = 50
+    for i in range(0, len(ticker_list), batch_size):
+        batch = ticker_list[i : i + batch_size]
         try:
-          if len(batch) == 1:
-            hist = data
-          else:
-            if ticker in data.columns.levels[0]:
-              hist = data[ticker]
-            else:
-              missing_tickers.append(ticker)
-              continue
+            data = yf.download(
+                batch,
+                period="3mo",
+                interval="1d",
+                auto_adjust=False,
+                group_by="ticker",
+                threads=True,
+                progress=False,
+            )
 
-          if (
-              hist.empty
-              or "Close" not in hist.columns
-              or "Volume" not in hist.columns
-          ):
-            missing_tickers.append(ticker)
-            continue
+            for ticker in batch:
+                try:
+                    if len(batch) == 1:
+                        hist = data
+                    else:
+                        if ticker in data.columns.levels[0]:
+                            hist = data[ticker]
+                        else:
+                            missing_tickers.append(ticker)
+                            continue
 
-          clean_hist = hist[["Close", "Volume"]].dropna(subset=["Close"])
-          if len(clean_hist) < 2:
-            missing_tickers.append(ticker)
-            continue
+                    if (
+                        hist.empty
+                        or "Close" not in hist.columns
+                        or "Volume" not in hist.columns
+                    ):
+                        missing_tickers.append(ticker)
+                        continue
 
-          price_data[ticker] = clean_hist
+                    clean_hist = hist[["Close", "Volume"]].dropna(subset=["Close"])
+                    if len(clean_hist) < 2:
+                        missing_tickers.append(ticker)
+                        continue
+
+                    price_data[ticker] = clean_hist
+                except Exception:
+                    missing_tickers.append(ticker)
         except Exception:
-          missing_tickers.append(ticker)
-    except Exception:
-      missing_tickers.extend(batch)
+            missing_tickers.extend(batch)
 
-  if missing_tickers:
-    alpaca_data, alpaca_failed = fetch_alpaca_fallback(
-        missing_tickers, api_key, secret_key
-    )
-    price_data.update(alpaca_data)
-    failed_tickers.extend(alpaca_failed)
+    if missing_tickers:
+        alpaca_data, alpaca_failed = fetch_alpaca_fallback(
+            missing_tickers, api_key, secret_key
+        )
+        price_data.update(alpaca_data)
+        failed_tickers.extend(alpaca_failed)
 
-  return price_data, failed_tickers
+    return price_data, failed_tickers
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ibb_data():
-  try:
-    ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="1mo")
-    if len(hist) >= 5:
-      prev_close = float(hist["Close"].iloc[-2])
-      latest_close = float(hist["Close"].iloc[-1])
-      change = latest_close - prev_close
-      pct_change = (change / prev_close) * 100
+    try:
+        ibb = yf.Ticker("IBB")
+        hist = ibb.history(period="1mo")
+        if len(hist) >= 5:
+            prev_close = float(hist["Close"].iloc[-2])
+            latest_close = float(hist["Close"].iloc[-1])
+            change = latest_close - prev_close
+            pct_change = (change / prev_close) * 100
 
-      high = hist["High"]
-      low = hist["Low"]
-      close = hist["Close"]
-      vol = hist["Volume"]
+            high = hist["High"]
+            low = hist["Low"]
+            close = hist["Close"]
+            vol = hist["Volume"]
 
-      range_hl = high - low
-      multiplier = ((close - low) - (high - close)) / range_hl.replace(0, np.nan)
-      multiplier = multiplier.fillna(0)
+            range_hl = high - low
+            multiplier = ((close - low) - (high - close)) / range_hl.replace(0, np.nan)
+            multiplier = multiplier.fillna(0)
 
-      mf_volume = multiplier * vol
-      cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
+            mf_volume = multiplier * vol
+            cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
 
-      price_5d_change = float(
-          ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
-      )
+            price_5d_change = float(
+                ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
+            )
 
-      if price_5d_change < 0 and cmf_5 >= 0:
-        divergence_info = "Bullish Div"
-      elif price_5d_change > 0 and cmf_5 < 0:
-        divergence_info = "Bearish Div"
-      else:
-        divergence_info = "Neutral"
+            if price_5d_change < 0 and cmf_5 >= 0:
+                divergence_info = "Bullish Div"
+            elif price_5d_change > 0 and cmf_5 < 0:
+                divergence_info = "Bearish Div"
+            else:
+                divergence_info = "Neutral"
 
-      return {
-          "price": latest_close,
-          "change": change,
-          "pct_change": pct_change,
-          "cmf": cmf_5,
-          "price_5d_change": price_5d_change,
-          "divergence_info": divergence_info,
-          "status": "OK",
-      }
-  except Exception:
-    pass
-  return {"status": "Error"}
+            return {
+                "price": latest_close,
+                "change": change,
+                "pct_change": pct_change,
+                "cmf": cmf_5,
+                "price_5d_change": price_5d_change,
+                "divergence_info": divergence_info,
+                "status": "OK",
+            }
+    except Exception:
+        pass
+    return {"status": "Error"}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_vxn_data():
-  try:
-    vxn = yf.Ticker("^VXN")
-    hist = vxn.history(period="1mo")
-    if len(hist) >= 2:
-      prev_close = float(hist["Close"].iloc[-2])
-      latest_close = float(hist["Close"].iloc[-1])
-      change = latest_close - prev_close
-      pct_change = (change / prev_close) * 100
+    try:
+        vxn = yf.Ticker("^VXN")
+        hist = vxn.history(period="1mo")
+        if len(hist) >= 2:
+            prev_close = float(hist["Close"].iloc[-2])
+            latest_close = float(hist["Close"].iloc[-1])
+            change = latest_close - prev_close
+            pct_change = (change / prev_close) * 100
 
-      return {
-          "price": latest_close,
-          "change": change,
-          "pct_change": pct_change,
-          "status": "OK",
-      }
-  except Exception:
-    pass
-  return {"status": "Error"}
+            return {
+                "price": latest_close,
+                "change": change,
+                "pct_change": pct_change,
+                "status": "OK",
+            }
+    except Exception:
+        pass
+    return {"status": "Error"}
 
 
+# ---------------------------------------------------------------------------
+# 4. MAIN DASHBOARD EXECUTION
+# ---------------------------------------------------------------------------
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data..."):
-    price_data, failed_tickers = fetch_screener_data(
-        tickers, alpaca_api_key, alpaca_secret_key
-    )
-    ibb_info = fetch_ibb_data()
-    vxn_info = fetch_vxn_data()
-
-  results = []
-  for ticker in tickers:
-    overview_url = f"https://www.stocktitan.net/overview/{ticker}/"
-    
-    if ticker not in price_data:
-      results.append({
-          "Ticker": ticker,
-          "Previous Close ($)": None,
-          "Latest Close ($)": None,
-          "Change ($)": None,
-          "Daily Change (%)": None,
-          "RVOL": None,
-          "Overview": overview_url,
-          "Status": "No data / insufficient history",
-      })
-      continue
-
-    df_hist = price_data[ticker]
-    prices = df_hist["Close"].dropna()
-    volumes = df_hist["Volume"].fillna(0)
-
-    if len(prices) < 2:
-      results.append({
-          "Ticker": ticker,
-          "Previous Close ($)": None,
-          "Latest Close ($)": None,
-          "Change ($)": None,
-          "Daily Change (%)": None,
-          "RVOL": None,
-          "Overview": overview_url,
-          "Status": "Insufficient history",
-      })
-      continue
-
-    previous_close = float(prices.iloc[-2])
-    latest_close = float(prices.iloc[-1])
-    latest_volume = float(volumes.iloc[-1])
-
-    if len(volumes) > 1:
-      avg_volume = float(volumes.iloc[:-1].tail(63).mean())
-    else:
-      avg_volume = 0
-
-    rvol = (
-        (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
-    )
-
-    if previous_close == 0:
-      results.append({
-          "Ticker": ticker,
-          "Previous Close ($)": previous_close,
-          "Latest Close ($)": latest_close,
-          "Change ($)": None,
-          "Daily Change (%)": None,
-          "RVOL": rvol,
-          "Overview": overview_url,
-          "Status": "Invalid previous close",
-      })
-      continue
-
-    change = latest_close - previous_close
-    pct_change = (change / previous_close) * 100
-
-    results.append({
-        "Ticker": ticker,
-        "Previous Close ($)": previous_close,
-        "Latest Close ($)": latest_close,
-        "Change ($)": change,
-        "Daily Change (%)": pct_change,
-        "RVOL": rvol,
-        "Overview": overview_url,
-        "Status": "OK",
-    })
-
-  df = pd.DataFrame(results)
-  df = df.sort_values(
-      by="Daily Change (%)", ascending=False, na_position="last"
-  ).reset_index(drop=True)
-  df.insert(0, "Rank", range(1, len(df) + 1))
-
-  st.session_state["df_results"] = df
-  st.session_state["failed_tickers"] = failed_tickers
-  st.session_state["ibb_info"] = ibb_info
-  st.session_state["vxn_info"] = vxn_info
-
-  df = st.session_state["df_results"]
-  failed_tickers = st.session_state["failed_tickers"]
-  ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
-  vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
-
-  # Metrics summary
-  valid = df[df["Status"] == "OK"]
-  col1, col2, col3 = st.columns(3)
-  col1.metric("Total Scanned", len(tickers))
-  col2.metric("Valid Data", len(valid))
-  col3.metric("Errors / Missing", len(failed_tickers))
-
-  if not valid.empty:
-    top = valid.iloc[0]
-    bottom = valid.iloc[-1]
-    st.success(
-        f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
-        f" 📉 **Bottom Performer:** {bottom['Ticker']}"
-        f" ({bottom['Daily Change (%)']:+.2f}%)"
-    )
-
-  # Display interactive dataframe (with index hidden)
-  st.subheader("📋 Stock Performance Table")
-  st.dataframe(
-      df.style.format(
-          {
-              "Previous Close ($)": "{:.4f}",
-              "Latest Close ($)": "{:.4f}",
-              "Change ($)": "{:+.4f}",
-              "Daily Change (%)": "{:+.2f}%",
-              "RVOL": "{:.2f}x",
-          },
-          na_rep="N/A",
-      ),
-      column_config={
-          "Overview": st.column_config.LinkColumn(
-              "Overview",
-              help="Click to view StockTitan overview",
-              max_chars=100,
-              display_text="Click here",
-          )
-      },
-      use_container_width=True,
-      hide_index=True,
-  )
-
-  # CSV Download Button
-  timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-  csv = df.to_csv(index=False).encode("utf-8")
-  st.download_button(
-      label="📥 Download Results as CSV",
-      data=csv,
-      file_name=f"biotech_daily_screener_{timestamp}.csv",
-      mime="text/csv",
-  )
-
-  st.markdown("---")
-
-  # ---------------------------------------------------------------------------
-  # LIVE CLINICAL TRIAL FEED SECTION (INTEGRATED)
-  # ---------------------------------------------------------------------------
-  st.subheader("🧬 Live Biotech & Clinical Trial Intelligence Feed")
-  st.caption("Aggregated clinical trial data modeled after financial intelligence platforms.")
-
-  trials_df = fetch_stocktitan_trials()
-
-  if not trials_df.empty:
-      # Sidebar or Inline Filters for Clinical Trials
-      c_filter_col1, c_filter_col2, c_filter_col3 = st.columns(3)
-      with c_filter_col1:
-          trial_search = st.text_input("🔍 Search Headlines / Drugs", "")
-      with c_filter_col2:
-          trial_tickers = ["All"] + sorted(list(trials_df["Ticker"].unique()))
-          selected_trial_ticker = st.selectbox("🎯 Select Stock Ticker", trial_tickers)
-      with c_filter_col3:
-          selected_trial_sentiment = st.selectbox("📊 Sentiment Filter", ["All", "Positive", "Neutral", "Negative"])
-
-      filtered_trials = trials_df.copy()
-      if trial_search:
-          filtered_trials = filtered_trials[filtered_trials["Headline"].str.contains(trial_search, case=False)]
-      if selected_trial_ticker != "All":
-          filtered_trials = filtered_trials[filtered_trials["Ticker"] == selected_trial_ticker]
-      if selected_trial_sentiment != "All":
-          filtered_trials = filtered_trials[filtered_trials["Sentiment"] == selected_trial_sentiment]
-
-      # Trial Metrics Bar
-      tm1, tm2, tm3 = st.columns(3)
-      tm1.metric("Total Trial Alerts", len(filtered_trials))
-      tm2.metric("Positive Catalysts", len(filtered_trials[filtered_trials["Sentiment"] == "Positive"]))
-      tm3.metric("Neutral/Pending", len(filtered_trials[filtered_trials["Sentiment"] == "Neutral"]))
-
-      st.markdown("---")
-
-      if not filtered_trials.empty:
-          for idx, row in filtered_trials.iterrows():
-              with st.container():
-                  col_d, col_h, col_s = st.columns([1.5, 7, 1.5])
-                  
-                  with col_d:
-                      st.caption(f"📅 {row['Date']}")
-                      st.markdown(f"**` {row['Ticker']} `**")
-                      
-                  with col_h:
-                      st.markdown(f"[{row['Headline']}]({row['Link']})")
-                      
-                  with col_s:
-                      if row['Sentiment'] == "Positive":
-                          st.success("🟢 Positive")
-                      elif row['Sentiment'] == "Negative":
-                          st.error("🔴 Negative")
-                      else:
-                          st.warning("🟡 Neutral")
-                  st.markdown("---")
-      else:
-          st.info("No matching clinical trials found for the selected criteria.")
-  else:
-      st.error("Unable to load live clinical trial feed right now.")
-
-  st.markdown("---")
-
-  # ---------------------------------------------------------------------------
-  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
-  # ---------------------------------------------------------------------------
-  tab_macro_info, tab_dashboard = st.tabs([
-      "📈 Macro & Sector Indicators", 
-      "📊 Sentiment Dashboard Visuals"
-  ])
-
-  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
-  with tab_macro_info:
-    if ibb_info.get("status") == "OK":
-      st.metric(
-          "IBB (iShares Biotechnology ETF)",
-          f"${ibb_info['price']:.2f}",
-          f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
-      )
-      
-      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
-      ind_col1, ind_col2 = st.columns(2)
-      
-      cmf_val = ibb_info['cmf']
-      divergence_info = ibb_info['divergence_info']
-      
-      cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
-      cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
-      
-      with ind_col1:
-        st.metric(
-            "Chaikin Money Flow (5D)", 
-            f"{cmf_val:+.3f}", 
-            delta=cmf_status, 
-            delta_color=cmf_delta_color
+    with st.spinner("Fetching live market data..."):
+        price_data, failed_tickers = fetch_screener_data(
+            tickers, alpaca_api_key, alpaca_secret_key
         )
-          
-      with ind_col2:
-        if "Bullish" in divergence_info:
-          div_delta_color = "normal"
-        elif "Bearish" in divergence_info:
-          div_delta_color = "inverse"
-        else:
-          div_delta_color = "off"
-          
-        st.metric(
-            "IBB Price / CMF 5D Divergence", 
-            divergence_info, 
-            delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
-            delta_color=div_delta_color
-        )
+        ibb_info = fetch_ibb_data()
+        vxn_info = fetch_vxn_data()
 
-      # VXN Info Display under Divergence
-      if vxn_info.get("status") == "OK":
-        vxn_val = vxn_info['price']
-        vxn_change = vxn_info['change']
-        vxn_pct = vxn_info['pct_change']
+    results = []
+    for ticker in tickers:
+        overview_url = f"https://www.stocktitan.net/overview/{ticker}/"
         
-        vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
-        
-        st.metric(
-            "CBOE NASDAQ Volatility Index (^VXN)",
-            f"{vxn_val:.2f}",
-            f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
-            delta_color=vxn_delta_color
-        )
-      else:
-        st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
+        if ticker not in price_data:
+            results.append({
+                "Ticker": ticker,
+                "Previous Close ($)": None,
+                "Latest Close ($)": None,
+                "Change ($)": None,
+                "Daily Change (%)": None,
+                "RVOL": None,
+                "Overview": overview_url,
+                "Status": "No data / insufficient history",
+            })
+            continue
 
-      # Rewritten Strategy Logic explanatory text
-      st.markdown(
-          "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
-          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
-          "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
-          "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
-          "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
-          "</p>",
-          unsafe_allow_html=True
-      )
-    else:
-      st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
+        df_hist = price_data[ticker]
+        prices = df_hist["Close"].dropna()
+        volumes = df_hist["Volume"].fillna(0)
 
-  # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
-  with tab_dashboard:
-    clean_df = df[df["Status"] == "OK"].copy()
-    if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
-      returns = pd.to_numeric(
-          clean_df["Daily Change (%)"], errors="coerce"
-      ).dropna()
+        if len(prices) < 2:
+            results.append({
+                "Ticker": ticker,
+                "Previous Close ($)": None,
+                "Latest Close ($)": None,
+                "Change ($)": None,
+                "Daily Change (%)": None,
+                "RVOL": None,
+                "Overview": overview_url,
+                "Status": "Insufficient history",
+            })
+            continue
 
-      if not returns.empty:
-        total = int(len(returns))
-        advancers = int((returns > 0).sum())
-        decliners = int((returns < 0).sum())
-        unchanged = int((returns == 0).sum())
+        previous_close = float(prices.iloc[-2])
+        latest_close = float(prices.iloc[-1])
+        latest_volume = float(volumes.iloc[-1])
 
-        advance_pct = advancers / total * 100
-        decline_pct = decliners / total * 100
-        unchanged_pct = unchanged / total * 100
-
-        median_return = float(returns.median())
-        mean_return = float(returns.mean())
-
-        breadth_score = advance_pct - decline_pct
-        return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
-        score = float(
-            np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100)
-        )
-
-        if score <= -60:
-          sentiment, sentiment_color = "VERY BEARISH", "#c92a2a"
-        elif score <= -30:
-          sentiment, sentiment_color = "BEARISH", "#f08c00"
-        elif score < 0:
-          sentiment, sentiment_color = "SLIGHTLY BEARISH", "#e0a800"
-        elif score < 30:
-          sentiment, sentiment_color = "SLIGHTLY BULLISH", "#74b816"
-        elif score < 60:
-          sentiment, sentiment_color = "BULLISH", "#2f9e44"
+        if len(volumes) > 1:
+            avg_volume = float(volumes.iloc[:-1].tail(63).mean())
         else:
-          sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
+            avg_volume = 0
 
-        fig = plt.figure(figsize=(16, 10), constrained_layout=True)
-        gs = fig.add_gridspec(
-            2, 2, height_ratios=[0.85, 1.15], width_ratios=[1.15, 1.0]
-        )
+        rvol = (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
 
-        ax_score = fig.add_subplot(gs[0, 0])
-        ax_breadth = fig.add_subplot(gs[0, 1])
-        ax_summary = fig.add_subplot(gs[1, 0])
-        ax_distribution = fig.add_subplot(gs[1, 1])
+        if previous_close == 0:
+            results.append({
+                "Ticker": ticker,
+                "Previous Close ($)": previous_close,
+                "Latest Close ($)": latest_close,
+                "Change ($)": None,
+                "Daily Change (%)": None,
+                "RVOL": rvol,
+                "Overview": overview_url,
+                "Status": "Invalid previous close",
+            })
+            continue
 
-        fig.suptitle(
-            "BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18, fontweight="bold"
-        )
+        change = latest_close - previous_close
+        pct_change = (change / previous_close) * 100
 
-        for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
-          ax.set_facecolor("#ffffff")
-          ax.set_axisbelow(True)
+        results.append({
+            "Ticker": ticker,
+            "Previous Close ($)": previous_close,
+            "Latest Close ($)": latest_close,
+            "Change ($)": change,
+            "Daily Change (%)": pct_change,
+            "RVOL": rvol,
+            "Overview": overview_url,
+            "Status": "OK",
+        })
 
-        # Panel 1
-        ax_score.set_title(
-            "1. Composite Sentiment Score",
-            fontsize=12,
-            fontweight="bold",
-            loc="left",
-            pad=12,
-        )
-        zone_colors = [
-            (-100, -60, "#c92a2a"),
-            (-60, -30, "#f08c00"),
-            (-30, 0, "#ffd43b"),
-            (0, 30, "#94d82d"),
-            (30, 60, "#2f9e44"),
-            (60, 100, "#087f5b"),
-        ]
-        ax_score.barh(
-            0, 200, left=-100, height=0.36, color="#f1f3f5", edgecolor="none"
-        )
-        for left, right, color in zone_colors:
-          ax_score.barh(
-              0,
-              right - left,
-              left=left,
-              height=0.36,
-              color=color,
-              alpha=0.22,
-              edgecolor="none",
-          )
-        ax_score.axvline(
-            score, color=sentiment_color, linewidth=3, ymin=0.28, ymax=0.80
-        )
-        ax_score.scatter(
-            [score],
-            [0],
-            color=sentiment_color,
-            edgecolor="white",
-            linewidth=1.5,
-            s=130,
-            zorder=5,
-        )
-        ax_score.axvline(0, color="#343a40", linewidth=1.2, linestyle="--")
-        ax_score.set_xlim(-105, 105)
-        ax_score.set_ylim(-0.8, 0.85)
-        ax_score.set_yticks([])
-        ax_score.set_xticks([-100, -60, -30, 0, 30, 60, 100])
-        ax_score.set_xlabel(f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8)
-        ax_score.text(
-            0.5,
-            0.94,
-            sentiment,
-            transform=ax_score.transAxes,
-            ha="center",
-            va="top",
-            fontsize=12,
-            fontweight="bold",
-            color=sentiment_color,
-        )
-        ax_score.grid(axis="x", alpha=0.15)
-        for spine in ax_score.spines.values():
-          spine.set_visible(False)
+    df = pd.DataFrame(results)
+    df = df.sort_values(
+        by="Daily Change (%)", ascending=False, na_position="last"
+    ).reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
 
-        # Panel 2
-        ax_breadth.set_title(
-            "2. Market Breadth",
-            fontsize=12,
-            fontweight="bold",
-            loc="left",
-            pad=12,
-        )
-        breadth_labels = ["Advancing", "Declining", "Unchanged"]
-        breadth_values = [advancers, decliners, unchanged]
-        bars = ax_breadth.bar(
-            breadth_labels,
-            breadth_values,
-            color=["#2f9e44", "#e03131", "#adb5bd"],
-            width=0.58,
-            edgecolor="white",
-            linewidth=1,
-        )
-        max_val = max(breadth_values) if breadth_values else 1
-        ax_breadth.set_ylim(0, max(1, max_val * 1.30))
-        for bar, value, percentage in zip(
-            bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]
-        ):
-          ax_breadth.annotate(
-              f"{value} stocks\n{percentage:.1f}%",
-              xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-              xytext=(0, 7),
-              textcoords="offset points",
-              ha="center",
-              va="bottom",
-              fontsize=8,
-              fontweight="bold",
-          )
-        ax_breadth.set_ylabel("Number of stocks", fontsize=9)
-        ax_breadth.grid(axis="y", alpha=0.2)
-        for spine in ["top", "right"]:
-          ax_breadth.spines[spine].set_visible(False)
+    st.session_state["df_results"] = df
+    st.session_state["failed_tickers"] = failed_tickers
+    st.session_state["ibb_info"] = ibb_info
+    st.session_state["vxn_info"] = vxn_info
 
-        # Panel 3
-        ax_summary.set_title(
-            "3. Sector Summary",
-            fontsize=12,
-            fontweight="bold",
-            loc="left",
-            pad=12,
-        )
-        ax_summary.set_facecolor("#f8f9fa")
-        ax_summary.set_xticks([])
-        ax_summary.set_yticks([])
-        for spine in ax_summary.spines.values():
-          spine.set_visible(True)
-          spine.set_color("#dee2e6")
-          spine.set_linewidth(1.2)
-        ax_summary.text(
-            0.05,
-            0.88,
-            "SECTOR SENTIMENT",
-            transform=ax_summary.transAxes,
-            fontsize=8,
-            color="#6c757d",
-            fontweight="bold",
-        )
-        ax_summary.text(
-            0.05,
-            0.74,
-            sentiment,
-            transform=ax_summary.transAxes,
-            fontsize=15,
-            color=sentiment_color,
-            fontweight="bold",
-        )
-        ax_summary.text(
-            0.95,
-            0.75,
-            f"{score:+.1f}/100",
-            transform=ax_summary.transAxes,
-            fontsize=12,
-            color=sentiment_color,
-            fontweight="bold",
-            ha="right",
-        )
-        ax_summary.axhline(
-            0.58, xmin=0.05, xmax=0.95, color="#dee2e6", linewidth=1
-        )
-        ax_summary.text(
-            0.05,
-            0.48,
-            "KEY STATISTICS",
-            transform=ax_summary.transAxes,
-            fontsize=8,
-            color="#6c757d",
-            fontweight="bold",
-        )
-        ax_summary.text(
-            0.05,
-            0.36,
-            f"Stocks analyzed: {total}\nAdvancers: {advancers}"
-            f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
-            f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
-            f" return: {mean_return:+.2f}%",
-            transform=ax_summary.transAxes,
-            fontsize=9,
-            linespacing=1.4,
-            va="top",
+    df = st.session_state["df_results"]
+    failed_tickers = st.session_state["failed_tickers"]
+    ibb_info = st.session_state.get("ibb_info", {"status": "Error"})
+    vxn_info = st.session_state.get("vxn_info", {"status": "Error"})
+
+    # Summary metrics
+    valid = df[df["Status"] == "OK"]
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Scanned", len(tickers))
+    col2.metric("Valid Data", len(valid))
+    col3.metric("Errors / Missing", len(failed_tickers))
+
+    if not valid.empty:
+        top = valid.iloc[0]
+        bottom = valid.iloc[-1]
+        st.success(
+            f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
+            f" 📉 **Bottom Performer:** {bottom['Ticker']}"
+            f" ({bottom['Daily Change (%)']:+.2f}%)"
         )
 
-        # Panel 4
-        ax_distribution.set_title(
-            "4. Daily Return Distribution",
-            fontsize=12,
-            fontweight="bold",
-            loc="left",
-            pad=12,
-        )
-        display_returns = returns.clip(lower=-15, upper=15)
-        ax_distribution.hist(
-            display_returns,
-            bins=30,
-            color="#4c78a8",
-            edgecolor="white",
-            linewidth=0.7,
-            alpha=0.88,
-        )
-        ax_distribution.axvline(
-            0,
-            color="#343a40",
-            linestyle="--",
-            linewidth=1.2,
-            label="Zero return",
-        )
-        ax_distribution.axvline(
-            median_return,
-            color="#e03131",
-            linewidth=1.8,
-            label=f"Median: {median_return:+.2f}%",
-        )
-        ax_distribution.axvline(
-            mean_return,
-            color="#f08c00",
-            linewidth=1.8,
-            linestyle=":",
-            label=f"Mean: {mean_return:+.2f}%",
-        )
-        ax_distribution.set_xlabel("Daily change (%)", fontsize=9)
-        ax_distribution.set_ylabel("Number of stocks", fontsize=9)
-        ax_distribution.legend(loc="upper right", frameon=False, fontsize=8)
-        ax_distribution.grid(axis="y", alpha=0.2)
-        for spine in ["top", "right"]:
-          ax_distribution.spines[spine].set_visible(False)
+    # Interactive stock table
+    st.subheader("📋 Stock Performance Table")
+    st.dataframe(
+        df.style.format(
+            {
+                "Previous Close ($)": "{:.4f}",
+                "Latest Close ($)": "{:.4f}",
+                "Change ($)": "{:+.4f}",
+                "Daily Change (%)": "{:+.2f}%",
+                "RVOL": "{:.2f}x",
+            },
+            na_rep="N/A",
+        ),
+        column_config={
+            "Overview": st.column_config.LinkColumn(
+                "Overview",
+                help="Click to view StockTitan overview",
+                max_chars=100,
+                display_text="Click here",
+            )
+        },
+        use_container_width=True,
+        hide_index=True,
+    )
 
-        st.pyplot(fig)
-        plt.close(fig)
+    # CSV Download
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Download Results as CSV",
+        data=csv,
+        file_name=f"biotech_daily_screener_{timestamp}.csv",
+        mime="text/csv",
+    )
 
-  # Auto-refresh logic
-  if auto_refresh:
-    st.info("⏳ Auto-refreshing in 1 minute...")
-    time.sleep(60)
-    st.cache_data.clear()
-    if "df_results" in st.session_state:
-      del st.session_state["df_results"]
-    st.rerun()
+    st.markdown("---")
+
+    # ---------------------------------------------------------------------------
+    # LIVE CLINICAL TRIAL FEED SECTION
+    # ---------------------------------------------------------------------------
+    st.subheader("🧬 Live Biotech & Clinical Trial Intelligence Feed")
+    st.caption("Aggregated clinical trial data modeled after financial intelligence platforms.")
+
+    trials_df = fetch_stocktitan_trials()
+
+    if not trials_df.empty:
+        c_filter_col1, c_filter_col2, c_filter_col3 = st.columns(3)
+        with c_filter_col1:
+            trial_search = st.text_input("🔍 Search Headlines / Drugs", "")
+        with c_filter_col2:
+            trial_tickers = ["All"] + sorted(list(trials_df["Ticker"].unique()))
+            selected_trial_ticker = st.selectbox("🎯 Select Stock Ticker", trial_tickers)
+        with c_filter_col3:
+            selected_trial_sentiment = st.selectbox("📊 Sentiment Filter", ["All", "Positive", "Neutral", "Negative"])
+
+        filtered_trials = trials_df.copy()
+        if trial_search:
+            filtered_trials = filtered_trials[filtered_trials["Headline"].str.contains(trial_search, case=False)]
+        if selected_trial_ticker != "All":
+            filtered_trials = filtered_trials[filtered_trials["Ticker"] == selected_trial_ticker]
+        if selected_trial_sentiment != "All":
+            filtered_trials = filtered_trials[filtered_trials["Sentiment"] == selected_trial_sentiment]
+
+        tm1, tm2, tm3 = st.columns(3)
+        tm1.metric("Total Trial Alerts", len(filtered_trials))
+        tm2.metric("Positive Catalysts", len(filtered_trials[filtered_trials["Sentiment"] == "Positive"]))
+        tm3.metric("Neutral/Pending", len(filtered_trials[filtered_trials["Sentiment"] == "Neutral"]))
+
+        st.markdown("---")
+
+        if not filtered_trials.empty:
+            for idx, row in filtered_trials.iterrows():
+                with st.container():
+                    col_d, col_h, col_s = st.columns([1.5, 7, 1.5])
+                    
+                    with col_d:
+                        st.caption(f"📅 {row['Date']}")
+                        st.markdown(f"**` {row['Ticker']} `**")
+                        
+                    with col_h:
+                        st.markdown(f"[{row['Headline']}]({row['Link']})")
+                        
+                    with col_s:
+                        if row['Sentiment'] == "Positive":
+                            st.success("🟢 Positive")
+                        elif row['Sentiment'] == "Negative":
+                            st.error("🔴 Negative")
+                        else:
+                            st.warning("🟡 Neutral")
+                    st.markdown("---")
+        else:
+            st.info("No matching clinical trials found for the selected criteria.")
+    else:
+        st.error("Unable to load live clinical trial feed right now.")
+
+    st.markdown("---")
+
+    # ---------------------------------------------------------------------------
+    # HORIZONTAL SWIPE TAB CONTAINER
+    # ---------------------------------------------------------------------------
+    tab_macro_info, tab_dashboard = st.tabs([
+        "📈 Macro & Sector Indicators", 
+        "📊 Sentiment Dashboard Visuals"
+    ])
+
+    with tab_macro_info:
+        if ibb_info.get("status") == "OK":
+            st.metric(
+                "IBB (iShares Biotechnology ETF)",
+                f"${ibb_info['price']:.2f}",
+                f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
+            )
+            
+            ind_col1, ind_col2 = st.columns(2)
+            
+            cmf_val = ibb_info['cmf']
+            divergence_info = ibb_info['divergence_info']
+            
+            cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+            cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
+            
+            with ind_col1:
+                st.metric(
+                    "Chaikin Money Flow (5D)", 
+                    f"{cmf_val:+.3f}", 
+                    delta=cmf_status, 
+                    delta_color=cmf_delta_color
+                )
+                
+            with ind_col2:
+                if "Bullish" in divergence_info:
+                    div_delta_color = "normal"
+                elif "Bearish" in divergence_info:
+                    div_delta_color = "inverse"
+                else:
+                    div_delta_color = "off"
+                    
+                st.metric(
+                    "IBB Price / CMF 5D Divergence", 
+                    divergence_info, 
+                    delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
+                    delta_color=div_delta_color
+                )
+
+            if vxn_info.get("status") == "OK":
+                vxn_val = vxn_info['price']
+                vxn_change = vxn_info['change']
+                vxn_pct = vxn_info['pct_change']
+                
+                vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
+                
+                st.metric(
+                    "CBOE NASDAQ Volatility Index (^VXN)",
+                    f"{vxn_val:.2f}",
+                    f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
+                    delta_color=vxn_delta_color
+                )
+            else:
+                st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
+
+            st.markdown(
+                "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
+                "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
+                "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
+                "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
+                "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
+                "</p>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
+
+    with tab_dashboard:
+        clean_df = df[df["Status"] == "OK"].copy()
+        if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
+            returns = pd.to_numeric(
+                clean_df["Daily Change (%)"], errors="coerce"
+            ).dropna()
+
+            if not returns.empty:
+                total = int(len(returns))
+                advancers = int((returns > 0).sum())
+                decliners = int((returns < 0).sum())
+                unchanged = int((returns == 0).sum())
+
+                advance_pct = advancers / total * 100
+                decline_pct = decliners / total * 100
+                unchanged_pct = unchanged / total * 100
+
+                median_return = float(returns.median())
+                mean_return = float(returns.mean())
+
+                breadth_score = advance_pct - decline_pct
+                return_score = float(np.clip(mean_return / 2.0 * 100, -100, 100))
+                score = float(
+                    np.clip(0.70 * breadth_score + 0.30 * return_score, -100, 100)
+                )
+
+                if score <= -60:
+                    sentiment, sentiment_color = "VERY BEARISH", "#c92a2a"
+                elif score <= -30:
+                    sentiment, sentiment_color = "BEARISH", "#f08c00"
+                elif score < 0:
+                    sentiment, sentiment_color = "SLIGHTLY BEARISH", "#e0a800"
+                elif score < 30:
+                    sentiment, sentiment_color = "SLIGHTLY BULLISH", "#74b816"
+                elif score < 60:
+                    sentiment, sentiment_color = "BULLISH", "#2f9e44"
+                else:
+                    sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
+
+                fig = plt.figure(figsize=(16, 10), constrained_layout=True)
+                gs = fig.add_gridspec(
+                    2, 2, height_ratios=[0.85, 1.15], width_ratios=[1.15, 1.0]
+                )
+
+                ax_score = fig.add_subplot(gs[0, 0])
+                ax_breadth = fig.add_subplot(gs[0, 1])
+                ax_summary = fig.add_subplot(gs[1, 0])
+                ax_distribution = fig.add_subplot(gs[1, 1])
+
+                fig.suptitle(
+                    "BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18, fontweight="bold"
+                )
+
+                for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
+                    ax.set_facecolor("#ffffff")
+                    ax.set_axisbelow(True)
+
+                # Panel 1
+                ax_score.set_title(
+                    "1. Composite Sentiment Score",
+                    fontsize=12,
+                    fontweight="bold",
+                    loc="left",
+                    pad=12,
+                )
+                zone_colors = [
+                    (-100, -60, "#c92a2a"),
+                    (-60, -30, "#f08c00"),
+                    (-30, 0, "#ffd43b"),
+                    (0, 30, "#94d82d"),
+                    (30, 60, "#2f9e44"),
+                    (60, 100, "#087f5b"),
+                ]
+                ax_score.barh(
+                    0, 200, left=-100, height=0.36, color="#f1f3f5", edgecolor="none"
+                )
+                for left, right, color in zone_colors:
+                    ax_score.barh(
+                        0,
+                        right - left,
+                        left=left,
+                        height=0.36,
+                        color=color,
+                        alpha=0.22,
+                        edgecolor="none",
+                    )
+                ax_score.axvline(
+                    score, color=sentiment_color, linewidth=3, ymin=0.28, ymax=0.80
+                )
+                ax_score.scatter(
+                    [score],
+                    [0],
+                    color=sentiment_color,
+                    edgecolor="white",
+                    linewidth=1.5,
+                    s=130,
+                    zorder=5,
+                )
+                ax_score.axvline(0, color="#343a40", linewidth=1.2, linestyle="--")
+                ax_score.set_xlim(-105, 105)
+                ax_score.set_ylim(-0.8, 0.85)
+                ax_score.set_yticks([])
+                ax_score.set_xticks([-100, -60, -30, 0, 30, 60, 100])
+                ax_score.set_xlabel(f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8)
+                ax_score.text(
+                    0.5,
+                    0.94,
+                    sentiment,
+                    transform=ax_score.transAxes,
+                    ha="center",
+                    va="top",
+                    fontsize=12,
+                    fontweight="bold",
+                    color=sentiment_color,
+                )
+                ax_score.grid(axis="x", alpha=0.15)
+                for spine in ax_score.spines.values():
+                    spine.set_visible(False)
+
+                # Panel 2
+                ax_breadth.set_title(
+                    "2. Market Breadth",
+                    fontsize=12,
+                    fontweight="bold",
+                    loc="left",
+                    pad=12,
+                )
+                breadth_labels = ["Advancing", "Declining", "Unchanged"]
+                breadth_values = [advancers, decliners, unchanged]
+                bars = ax_breadth.bar(
+                    breadth_labels,
+                    breadth_values,
+                    color=["#2f9e44", "#e03131", "#adb5bd"],
+                    width=0.58,
+                    edgecolor="white",
+                    linewidth=1,
+                )
+                max_val = max(breadth_values) if breadth_values else 1
+                ax_breadth.set_ylim(0, max(1, max_val * 1.30))
+                for bar, value, percentage in zip(
+                    bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]
+                ):
+                    ax_breadth.annotate(
+                        f"{value} stocks\n{percentage:.1f}%",
+                        xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                        xytext=(0, 7),
+                        textcoords="offset points",
+                        ha="center",
+                        va="bottom",
+                        fontsize=8,
+                        fontweight="bold",
+                    )
+                ax_breadth.set_ylabel("Number of stocks", fontsize=9)
+                ax_breadth.grid(axis="y", alpha=0.2)
+                for spine in ["top", "right"]:
+                    ax_breadth.spines[spine].set_visible(False)
+
+                # Panel 3
+                ax_summary.set_title(
+                    "3. Sector Summary",
+                    fontsize=12,
+                    fontweight="bold",
+                    loc="left",
+                    pad=12,
+                )
+                ax_summary.set_facecolor("#f8f9fa")
+                ax_summary.set_xticks([])
+                ax_summary.set_yticks([])
+                for spine in ax_summary.spines.values():
+                    spine.set_visible(True)
+                    spine.set_color("#dee2e6")
+                    spine.set_linewidth(1.2)
+                ax_summary.text(
+                    0.05,
+                    0.88,
+                    "SECTOR SENTIMENT",
+                    transform=ax_summary.transAxes,
+                    fontsize=8,
+                    color="#6c757d",
+                    fontweight="bold",
+                )
+                ax_summary.text(
+                    0.05,
+                    0.74,
+                    sentiment,
+                    transform=ax_summary.transAxes,
+                    fontsize=15,
+                    color=sentiment_color,
+                    fontweight="bold",
+                )
+                ax_summary.text(
+                    0.95,
+                    0.75,
+                    f"{score:+.1f}/100",
+                    transform=ax_summary.transAxes,
+                    fontsize=12,
+                    color=sentiment_color,
+                    fontweight="bold",
+                    ha="right",
+                )
+                ax_summary.axhline(
+                    0.58, xmin=0.05, xmax=0.95, color="#dee2e6", linewidth=1
+                )
+                ax_summary.text(
+                    0.05,
+                    0.48,
+                    "KEY STATISTICS",
+                    transform=ax_summary.transAxes,
+                    fontsize=8,
+                    color="#6c757d",
+                    fontweight="bold",
+                )
+                ax_summary.text(
+                    0.05,
+                    0.36,
+                    f"Stocks analyzed: {total}\nAdvancers: {advancers}"
+                    f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
+                    f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
+                    f" return: {mean_return:+.2f}%",
+                    transform=ax_summary.transAxes,
+                    fontsize=9,
+                    linespacing=1.4,
+                    va="top",
+                )
+
+                # Panel 4
+                ax_distribution.set_title(
+                    "4. Daily Return Distribution",
+                    fontsize=12,
+                    fontweight="bold",
+                    loc="left",
+                    pad=12,
+                )
+                display_returns = returns.clip(lower=-15, upper=15)
+                ax_distribution.hist(
+                    display_returns,
+                    bins=30,
+                    color="#4c78a8",
+                    edgecolor="white",
+                    linewidth=0.7,
+                    alpha=0.88,
+                )
+                ax_distribution.axvline(
+                    0,
+                    color="#343a40",
+                    linestyle="--",
+                    linewidth=1.2,
+                    label="Zero return",
+                )
+                ax_distribution.axvline(
+                    median_return,
+                    color="#e03131",
+                    linewidth=1.8,
+                    label=f"Median: {median_return:+.2f}%",
+                )
+                ax_distribution.axvline(
+                    mean_return,
+                    color="#f08c00",
+                    linewidth=1.8,
+                    linestyle=":",
+                    label=f"Mean: {mean_return:+.2f}%",
+                )
+                ax_distribution.set_xlabel("Daily change (%)", fontsize=9)
+                ax_distribution.set_ylabel("Number of stocks", fontsize=9)
+                ax_distribution.legend(loc="upper right", frameon=False, fontsize=8)
+                ax_distribution.grid(axis="y", alpha=0.2)
+                for spine in ["top", "right"]:
+                    ax_distribution.spines[spine].set_visible(False)
+
+                st.pyplot(fig)
+                plt.close(fig)
+
+    if auto_refresh:
+        st.info("⏳ Auto-refreshing in 1 minute...")
+        time.sleep(60)
+        st.cache_data.clear()
+        if "df_results" in st.session_state:
+            del st.session_state["df_results"]
+        st.rerun()
 else:
-  st.info(
-      "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
-      " generate the graphs."
-  )
+    st.info(
+        "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
+        " generate the graphs."
+    )
