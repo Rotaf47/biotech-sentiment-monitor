@@ -540,60 +540,62 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # HORIZONTAL SWIPE TAB CONTAINER (CLINICAL RSS FEED FIRST)
+  # 1. STOCKTITAN CLINICAL RSS FEED SECTION (PLACED ON TOP OF SWIPE TOOL)
   # ---------------------------------------------------------------------------
-  tab_clinical_feed, tab_macro_info, tab_dashboard = st.tabs([
-      "🔬 StockTitan Clinical RSS Feed",
+  st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
+  st.markdown(
+      "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
+      "Live feed tracking real-time clinical trial announcements and updates."
+      "</p>",
+      unsafe_allow_html=True
+  )
+  
+  if clinical_rss_entries:
+    for entry in clinical_rss_entries:
+      ticker = entry['ticker']
+      description = entry['description']
+      link = entry['link']
+      published = entry['published']
+      
+      pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
+      
+      card_html = f"""
+      <div style="
+          background-color: #ffffff; 
+          border: 1px solid #e2e8f0; 
+          border-left: 4px solid #3b82f6; 
+          padding: 12px 14px; 
+          margin-bottom: 12px; 
+          border-radius: 6px; 
+          box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      ">
+          <div style="margin-bottom: 6px;">
+              {pub_badge}
+              <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
+          </div>
+          <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
+              <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
+          </div>
+      </div>
+      """
+      st.markdown(card_html, unsafe_allow_html=True)
+  else:
+    st.markdown(
+        "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
+        unsafe_allow_html=True
+    )
+
+  st.markdown("---")
+
+  # ---------------------------------------------------------------------------
+  # 2. SEPARATED SWIPE TOOL (MACRO INDICATORS & SENTIMENT DASHBOARD)
+  # ---------------------------------------------------------------------------
+  tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators", 
       "📊 Sentiment Dashboard Visuals"
   ])
 
-  # SLIDE 1: CLINICAL RSS FEED TAB
-  with tab_clinical_feed:
-    st.markdown("### StockTitan Clinical Trial Results RSS Feed")
-    st.markdown(
-        "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-        "Live feed tracking real-time clinical trial announcements and updates."
-        "</p>",
-        unsafe_allow_html=True
-    )
-    
-    if clinical_rss_entries:
-      for entry in clinical_rss_entries:
-        ticker = entry['ticker']
-        description = entry['description']
-        link = entry['link']
-        published = entry['published']
-        
-        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
-        
-        card_html = f"""
-        <div style="
-            background-color: #ffffff; 
-            border: 1px solid #e2e8f0; 
-            border-left: 4px solid #3b82f6; 
-            padding: 12px 14px; 
-            margin-bottom: 12px; 
-            border-radius: 6px; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        ">
-            <div style="margin-bottom: 6px;">
-                {pub_badge}
-                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
-            </div>
-            <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
-                <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
-            </div>
-        </div>
-        """
-        st.markdown(card_html, unsafe_allow_html=True)
-    else:
-      st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
-          unsafe_allow_html=True
-      )
-
-  # SLIDE 2: MACRO INFOS SECTION
+  # MACRO INFOS SECTION
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -661,7 +663,7 @@ if st.session_state.get("is_running", False):
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
-  # SLIDE 3: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
+  # SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
