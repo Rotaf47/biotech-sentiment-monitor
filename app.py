@@ -7,132 +7,673 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 
+
 # Page Configuration
+
 st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
-# Custom CSS fix to make the tab row bottom border span completely and stay uniform
-st.markdown("""
-<style>
-/* Forces the tab container bottom border rule to render continuously */
-[data-baseweb="tab-list"] {
-    border-bottom: 2px solid #e2e8f0 !important;
-    gap: 8px;
-}
-[data-baseweb="tab"] {
-    height: 45px;
-}
-</style>
-""", unsafe_allow_html=True)
 
 st.title("🧬 BSM")
+
 st.markdown(
     "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
     " visualizes market sentiment."
 )
 
+
 # Sidebar controls for Alpaca API Credentials
+
 st.sidebar.header("Alpaca API Settings")
+
 alpaca_api_key = st.sidebar.text_input(
     "Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password"
 )
+
 alpaca_secret_key = st.sidebar.text_input(
     "Alpaca Secret Key",
     value="3Lo3FMU1TdEbvYQzAZ5XMLFre7bmzd1Lp9fDJ6PJ2czx",
     type="password",
 )
 
+
 # Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
+
 DEFAULT_TICKERS = [
-    "AAPG", "AARD", "ABCL", "ABEO", "ABOS", "ABSI", "ABUS", "ABVC", "ABVX", "ACAD",
-    "ACET", "ACHV", "ACIU", "ACOG", "ACRS", "ACRV", "ACTU", "ACXP", "ADAG", "ADIL",
-    "ADMA", "ADRX", "ADXN", "AEON", "AGEN", "AGIO", "AGMB", "AIM", "AKTS", "AKTX",
-    "ALDX", "ALEC", "ALGS", "ALLO", "ALLR", "ALMS", "ALNY", "ALPS", "ALT", "ALXO",
-    "ALZN", "ANAB", "ANIX", "ANL", "ANNX", "ANRO", "ANTX", "ANVS", "APLM", "APMD",
-    "APRE", "APVO", "ARCT", "ARDX", "ARGX", "ARMP", "ARQT", "ARTL", "ARTV", "ARVN",
-    "ARWR", "ASMB", "ASND", "ATHE", "ATNM", "ATOS", "ATRA", "ATTO", "ATYR", "AUPH",
-    "AURA", "AUTL", "AVBP", "AVIR", "AVLN", "AVTX", "AVXL", "AXSM", "AZTR", "BBIO",
-    "BBLG", "BBOT", "BCAX", "BCDA", "BCTX", "BCYC", "BDRX", "BDTX", "BEAM", "BHVN",
-    "BIVI", "BLRX", "BLSM", "BLTE", "BMEA", "BMRN", "BNTC", "BNTX", "BOLD", "BOLT",
-    "BRTX", "BRVE", "BSEM", "BYSI", "CABA", "CADL", "CAI", "CALC", "CAMP", "CANF",
-    "CAPR", "CBIO", "CBUS", "CCCC", "CDIO", "CDT", "CDXS", "CELC", "CELU", "CELZ",
-    "CGEM", "CGEN", "CGON", "CGTX", "CHRS", "CING", "CLDI", "CLDX", "CLGN", "CLLS",
-    "CLNN", "CLRB", "CLYM", "CMMB", "CMND", "CMPX", "CNSP", "CNSY", "CNTB", "CNTN",
-    "CNTX", "CNXU", "COAG", "COCP", "COGT", "CORT", "COYA", "CRBP", "CRBU", "CRDF",
-    "CRIS", "CRMD", "CRSP", "CRVO", "CRVS", "CSBR", "CTMX", "CTNM", "CTXR", "CTY",
-    "CUE", "CUVL", "CVKD", "CVM", "CYTK", "DARE", "DBVT", "DCOY", "DFTX", "DMAC",
-    "DMRA", "DNA", "DNLI", "DNTH", "DRMA", "DRTS", "DRUG", "DSGN", "DTIL", "DWTX",
-    "DYAI", "DYN", "EDIT", "EDSA", "EDVA", "EIKN", "ELAB", "ELDN", "ELOX", "ELTX",
-    "ELVN", "ENGN", "ENLV", "ENSC", "ENTA", "ENTX", "ENVB", "EOCN", "EPRX", "EQ",
-    "ERAS", "ERNA", "ESLA", "ETRA", "EVAX", "EVGN", "EVMN", "EWTX", "EXEL", "EXOZ",
-    "EYPT", "FATE", "FBIO", "FBLG", "FDMT", "FENC", "FHTX", "FLNA", "FTH", "FTRE",
-    "FULC", "GALT", "GANX", "GDTC", "GENB", "GERN", "GHRS", "GLSI", "GLUE", "GMAB",
-    "GNLX", "GNPX", "GOSS", "GOVX", "GPCR", "GRCE", "GRDX", "GRI", "GTBP", "GUTS",
-    "GYRE", "HALO", "HCWB", "HELP", "HIND", "HOWL", "HRMY", "HRTX", "HUMA", "HURA",
-    "HYFT", "HYPD", "IAM", "IBIO", "IBO", "IBRX", "ICCC", "ICU", "IDYA", "IFRX",
-    "IGC", "IKT", "IMA", "IMCR", "IMMP", "IMMX", "IMNM", "IMNN", "IMRN", "IMRX",
-    "IMTX", "IMUX", "IMVT", "INAB", "INBX", "INCY", "INDP", "INKT", "INMB", "INO",
-    "INSM", "INTS", "INVA", "IONS", "IOVA", "IPHA", "IPSC", "IRD", "IRLA", "IRON",
-    "IVA", "IVVD", "JAGX", "JANX", "JAZZ", "JBIO", "JSPR", "JUNS", "KALA", "KAPA",
-    "KARD", "KLRA", "KLRS", "KOD", "KPRX", "KPTI", "KROS", "KRRO", "KRSA", "KRYS",
-    "KTTA", "KURA", "KYMR", "KYNB", "KYTX", "KZIA", "LABT", "LBRX", "LCTX", "LEGN",
-    "LENZ", "LEXX", "LGND", "LGVN", "LIMN", "LITS", "LKFT", "LNAI", "LONA", "LPCN",
-    "LRMR", "LSTA", "LTGO", "LTRN", "LXEO", "LXRX", "LYEL", "MAIA", "MANE", "MAZE",
-    "MBIO", "MBRX", "MBX", "MCRB", "MDGL", "MDWD", "MDXG", "MENS", "MESO", "MGNX",
-    "MGTX", "MGX", "MIRM", "MIST", "MLEC", "MLTX", "MLYS", "MNKD", "MNOV", "MNPR",
-    "MOLN", "MPLT", "MREO", "MRKR", "MRNA", "MRVI", "MSLE", "MTNB", "MTVA", "NAMS",
-    "NAUT", "NBP", "NBTX", "NCEL", "NCNA", "NERV", "NEUP", "NGEN", "NGNE", "NIKI",
-    "NKTR", "NKTX", "NMRA", "NNVC", "NRIX", "NRSN", "NRXP", "NRXS", "NTHI", "NTLA",
-    "NTRB", "NUVB", "NVAX", "NVCT", "NXTC", "OABI", "OBIO", "OBX", "OCGN", "OCS",
-    "OCUL", "ODTX", "OGEN", "OKUR", "OKYO", "OLMA", "OMER", "ONC", "ONCO", "ONCY",
-    "ORIC", "ORKA", "ORMP", "OSTX", "OTLK", "OVID", "PALI", "PASG", "PBLS", "PBM",
-    "PBYI", "PCSA", "PCVX", "PDSB", "PEPG", "PGEN", "PHAR", "PHAT", "PHIO", "PHVS",
-    "PLRX", "PLRZ", "PLUR", "PLX", "PLYX", "PMCB", "PMN", "PMVP", "PPBT", "PPCB",
-    "PRAX", "PRLD", "PRME", "PROK", "PRQR", "PRTA", "PTCT", "PTGX", "PTHS", "PTN",
-    "PULM", "PVLA", "PYPD", "PYXS", "QNRX", "QNTM", "QTTB", "QURE", "RADX", "RANI",
-    "RAPP", "RARE", "RCKT", "RCUS", "REGN", "REPL", "REVB", "RGNX", "RIGL", "RLAY",
-    "RLMD", "RLYB", "RNA", "RNAC", "RNAZ", "RNTX", "RNXT", "ROIV", "RPRX", "RTSN",
-    "RVMD", "RXRX", "RYTM", "RZLT", "SABS", "SANA", "SCNI", "SCTX", "SEER", "SEPN",
-    "SER", "SGMT", "SGP", "SILO", "SION", "SKYE", "SLBT", "SLDB", "SLGL", "SLN",
-    "SXTP", "TCRT", "SPRY", "TECH", "TRDA", "XCUR", "TRAX", "TIL", "TARA", "SRPT",
-    "SVRA", "SRRK", "SPRC", "SPTX", "SLS", "SNTI", "STTK", "SLXN", "SNGX", "SPRO",
-    "SPRB", "SYRE", "STOK", "SMMT", "SRZN", "STRO", "SNDX", "TNGX", "TARS", "TSHA",
-    "TECX", "TLX", "TELO", "TPST", "TENX", "TNYA", "TVGN", "TGTX", "TOVX", "TLSA",
-    "TNXP", "TVTX", "TRAW", "TRVI", "TRXB", "TCRX", "TTRX", "TVRD", "TWST", "TYRA",
-    "UNCY", "UPB", "URGN", "VBIO", "VALN", "VNDA", "VERA", "VSTM", "VRXA", "VCEL",
-    "VRCA", "VRTX", "VERU", "VCRE", "VKTX", "VIR", "VRAX", "VRDN", "VTGN", "VANI",
-    "VIVS", "VOGX", "VOR", "VYGR", "VTVT", "WVE", "WHWK", "XFOR", "XBIT", "XNCR",
-    "XBIO", "XENE", "XLO", "XRTX", "XTLB", "YARW", "YDES", "ZLAB", "ZBIO", "ZNTL",
-    "ZVRA", "ZURA", "ZYME",
+    "AAPG",
+    "AARD",
+    "ABCL",
+    "ABEO",
+    "ABOS",
+    "ABSI",
+    "ABUS",
+    "ABVC",
+    "ABVX",
+    "ACAD",
+    "ACET",
+    "ACHV",
+    "ACIU",
+    "ACOG",
+    "ACRS",
+    "ACRV",
+    "ACTU",
+    "ACXP",
+    "ADAG",
+    "ADIL",
+    "ADMA",
+    "ADRX",
+    "ADXN",
+    "AEON",
+    "AGEN",
+    "AGIO",
+    "AGMB",
+    "AIM",
+    "AKTS",
+    "AKTX",
+    "ALDX",
+    "ALEC",
+    "ALGS",
+    "ALLO",
+    "ALLR",
+    "ALMS",
+    "ALNY",
+    "ALPS",
+    "ALT",
+    "ALXO",
+    "ALZN",
+    "ANAB",
+    "ANIX",
+    "ANL",
+    "ANNX",
+    "ANRO",
+    "ANTX",
+    "ANVS",
+    "APLM",
+    "APMD",
+    "APRE",
+    "APVO",
+    "ARCT",
+    "ARDX",
+    "ARGX",
+    "ARMP",
+    "ARQT",
+    "ARTL",
+    "ARTV",
+    "ARVN",
+    "ARWR",
+    "ASMB",
+    "ASND",
+    "ATHE",
+    "ATNM",
+    "ATOS",
+    "ATRA",
+    "ATTO",
+    "ATYR",
+    "AUPH",
+    "AURA",
+    "AUTL",
+    "AVBP",
+    "AVIR",
+    "AVLN",
+    "AVTX",
+    "AVXL",
+    "AXSM",
+    "AZTR",
+    "BBIO",
+    "BBLG",
+    "BBOT",
+    "BCAX",
+    "BCDA",
+    "BCTX",
+    "BCYC",
+    "BDRX",
+    "BDTX",
+    "BEAM",
+    "BHVN",
+    "BIVI",
+    "BLRX",
+    "BLSM",
+    "BLTE",
+    "BMEA",
+    "BMRN",
+    "BNTC",
+    "BNTX",
+    "BOLD",
+    "BOLT",
+    "BRTX",
+    "BRVE",
+    "BSEM",
+    "BYSI",
+    "CABA",
+    "CADL",
+    "CAI",
+    "CALC",
+    "CAMP",
+    "CANF",
+    "CAPR",
+    "CBIO",
+    "CBUS",
+    "CCCC",
+    "CDIO",
+    "CDT",
+    "CDXS",
+    "CELC",
+    "CELU",
+    "CELZ",
+    "CGEM",
+    "CGEN",
+    "CGON",
+    "CGTX",
+    "CHRS",
+    "CING",
+    "CLDI",
+    "CLDX",
+    "CLGN",
+    "CLLS",
+    "CLNN",
+    "CLRB",
+    "CLYM",
+    "CMMB",
+    "CMND",
+    "CMPX",
+    "CNSP",
+    "CNSY",
+    "CNTB",
+    "CNTN",
+    "CNTX",
+    "CNXU",
+    "COAG",
+    "COCP",
+    "COGT",
+    "CORT",
+    "COYA",
+    "CRBP",
+    "CRBU",
+    "CRDF",
+    "CRIS",
+    "CRMD",
+    "CRSP",
+    "CRVO",
+    "CRVS",
+    "CSBR",
+    "CTMX",
+    "CTNM",
+    "CTXR",
+    "CTY",
+    "CUE",
+    "CUVL",
+    "CVKD",
+    "CVM",
+    "CYTK",
+    "DARE",
+    "DBVT",
+    "DCOY",
+    "DFTX",
+    "DMAC",
+    "DMRA",
+    "DNA",
+    "DNLI",
+    "DNTH",
+    "DRMA",
+    "DRTS",
+    "DRUG",
+    "DSGN",
+    "DTIL",
+    "DWTX",
+    "DYAI",
+    "DYN",
+    "EDIT",
+    "EDSA",
+    "EDVA",
+    "EIKN",
+    "ELAB",
+    "ELDN",
+    "ELOX",
+    "ELTX",
+    "ELVN",
+    "ENGN",
+    "ENLV",
+    "ENSC",
+    "ENTA",
+    "ENTX",
+    "ENVB",
+    "EOCN",
+    "EPRX",
+    "EQ",
+    "ERAS",
+    "ERNA",
+    "ESLA",
+    "ETRA",
+    "EVAX",
+    "EVGN",
+    "EVMN",
+    "EWTX",
+    "EXEL",
+    "EXOZ",
+    "EYPT",
+    "FATE",
+    "FBIO",
+    "FBLG",
+    "FDMT",
+    "FENC",
+    "FHTX",
+    "FLNA",
+    "FTH",
+    "FTRE",
+    "FULC",
+    "GALT",
+    "GANX",
+    "GDTC",
+    "GENB",
+    "GERN",
+    "GHRS",
+    "GLSI",
+    "GLUE",
+    "GMAB",
+    "GNLX",
+    "GNPX",
+    "GOSS",
+    "GOVX",
+    "GPCR",
+    "GRCE",
+    "GRDX",
+    "GRI",
+    "GTBP",
+    "GUTS",
+    "GYRE",
+    "HALO",
+    "HCWB",
+    "HELP",
+    "HIND",
+    "HOWL",
+    "HRMY",
+    "HRTX",
+    "HUMA",
+    "HURA",
+    "HYFT",
+    "HYPD",
+    "IAM",
+    "IBIO",
+    "IBO",
+    "IBRX",
+    "ICCC",
+    "ICU",
+    "IDYA",
+    "IFRX",
+    "IGC",
+    "IKT",
+    "IMA",
+    "IMCR",
+    "IMMP",
+    "IMMX",
+    "IMNM",
+    "IMNN",
+    "IMRN",
+    "IMRX",
+    "IMTX",
+    "IMUX",
+    "IMVT",
+    "INAB",
+    "INBX",
+    "INCY",
+    "INDP",
+    "INKT",
+    "INMB",
+    "INO",
+    "INSM",
+    "INTS",
+    "INVA",
+    "IONS",
+    "IOVA",
+    "IPHA",
+    "IPSC",
+    "IRD",
+    "IRLA",
+    "IRON",
+    "IVA",
+    "IVVD",
+    "JAGX",
+    "JANX",
+    "JAZZ",
+    "JBIO",
+    "JSPR",
+    "JUNS",
+    "KALA",
+    "KAPA",
+    "KARD",
+    "KLRA",
+    "KLRS",
+    "KOD",
+    "KPRX",
+    "KPTI",
+    "KROS",
+    "KRRO",
+    "KRSA",
+    "KRYS",
+    "KTTA",
+    "KURA",
+    "KYMR",
+    "KYNB",
+    "KYTX",
+    "KZIA",
+    "LABT",
+    "LBRX",
+    "LCTX",
+    "LEGN",
+    "LENZ",
+    "LEXX",
+    "LGND",
+    "LGVN",
+    "LIMN",
+    "LITS",
+    "LKFT",
+    "LNAI",
+    "LONA",
+    "LPCN",
+    "LRMR",
+    "LSTA",
+    "LTGO",
+    "LTRN",
+    "LXEO",
+    "LXRX",
+    "LYEL",
+    "MAIA",
+    "MANE",
+    "MAZE",
+    "MBIO",
+    "MBRX",
+    "MBX",
+    "MCRB",
+    "MDGL",
+    "MDWD",
+    "MDXG",
+    "MENS",
+    "MESO",
+    "MGNX",
+    "MGTX",
+    "MGX",
+    "MIRM",
+    "MIST",
+    "MLEC",
+    "MLTX",
+    "MLYS",
+    "MNKD",
+    "MNOV",
+    "MNPR",
+    "MOLN",
+    "MPLT",
+    "MREO",
+    "MRKR",
+    "MRNA",
+    "MRVI",
+    "MSLE",
+    "MTNB",
+    "MTVA",
+    "NAMS",
+    "NAUT",
+    "NBP",
+    "NBTX",
+    "NCEL",
+    "NCNA",
+    "NERV",
+    "NEUP",
+    "NGEN",
+    "NGNE",
+    "NIKI",
+    "NKTR",
+    "NKTX",
+    "NMRA",
+    "NNVC",
+    "NRIX",
+    "NRSN",
+    "NRXP",
+    "NRXS",
+    "NTHI",
+    "NTLA",
+    "NTRB",
+    "NUVB",
+    "NVAX",
+    "NVCT",
+    "NXTC",
+    "OABI",
+    "OBIO",
+    "OBX",
+    "OCGN",
+    "OCS",
+    "OCUL",
+    "ODTX",
+    "OGEN",
+    "OKUR",
+    "OKYO",
+    "OLMA",
+    "OMER",
+    "ONC",
+    "ONCO",
+    "ONCY",
+    "ORIC",
+    "ORKA",
+    "ORMP",
+    "OSTX",
+    "OTLK",
+    "OVID",
+    "PALI",
+    "PASG",
+    "PBLS",
+    "PBM",
+    "PBYI",
+    "PCSA",
+    "PCVX",
+    "PDSB",
+    "PEPG",
+    "PGEN",
+    "PHAR",
+    "PHAT",
+    "PHIO",
+    "PHVS",
+    "PLRX",
+    "PLRZ",
+    "PLUR",
+    "PLX",
+    "PLYX",
+    "PMCB",
+    "PMN",
+    "PMVP",
+    "PPBT",
+    "PPCB",
+    "PRAX",
+    "PRLD",
+    "PRME",
+    "PROK",
+    "PRQR",
+    "PRTA",
+    "PTCT",
+    "PTGX",
+    "PTHS",
+    "PTN",
+    "PULM",
+    "PVLA",
+    "PYPD",
+    "PYXS",
+    "QNRX",
+    "QNTM",
+    "QTTB",
+    "QURE",
+    "RADX",
+    "RANI",
+    "RAPP",
+    "RARE",
+    "RCKT",
+    "RCUS",
+    "REGN",
+    "REPL",
+    "REVB",
+    "RGNX",
+    "RIGL",
+    "RLAY",
+    "RLMD",
+    "RLYB",
+    "RNA",
+    "RNAC",
+    "RNAZ",
+    "RNTX",
+    "RNXT",
+    "ROIV",
+    "RPRX",
+    "RTSN",
+    "RVMD",
+    "RXRX",
+    "RYTM",
+    "RZLT",
+    "SABS",
+    "SANA",
+    "SCNI",
+    "SCTX",
+    "SEER",
+    "SEPN",
+    "SER",
+    "SGMT",
+    "SGP",
+    "SILO",
+    "SION",
+    "SKYE",
+    "SLBT",
+    "SLDB",
+    "SLGL",
+    "SLN",
+    "SXTP",
+    "TCRT",
+    "SPRY",
+    "TECH",
+    "TRDA",
+    "XCUR",
+    "TRAX",
+    "TIL",
+    "TARA",
+    "SRPT",
+    "SVRA",
+    "SRRK",
+    "SPRC",
+    "SPTX",
+    "SLS",
+    "SNTI",
+    "STTK",
+    "SLXN",
+    "SNGX",
+    "SPRO",
+    "SPRB",
+    "SYRE",
+    "STOK",
+    "SMMT",
+    "SRZN",
+    "STRO",
+    "SNDX",
+    "TNGX",
+    "TARS",
+    "TSHA",
+    "TECX",
+    "TLX",
+    "TELO",
+    "TPST",
+    "TENX",
+    "TNYA",
+    "TVGN",
+    "TGTX",
+    "TOVX",
+    "TLSA",
+    "TNXP",
+    "TVTX",
+    "TRAW",
+    "TRVI",
+    "TRXB",
+    "TCRX",
+    "TTRX",
+    "TVRD",
+    "TWST",
+    "TYRA",
+    "UNCY",
+    "UPB",
+    "URGN",
+    "VBIO",
+    "VALN",
+    "VNDA",
+    "VERA",
+    "VSTM",
+    "VRXA",
+    "VCEL",
+    "VRCA",
+    "VRTX",
+    "VERU",
+    "VCRE",
+    "VKTX",
+    "VIR",
+    "VRAX",
+    "VRDN",
+    "VTGN",
+    "VANI",
+    "VIVS",
+    "VOGX",
+    "VOR",
+    "VYGR",
+    "VTVT",
+    "WVE",
+    "WHWK",
+    "XFOR",
+    "XBIT",
+    "XNCR",
+    "XBIO",
+    "XENE",
+    "XLO",
+    "XRTX",
+    "XTLB",
+    "YARW",
+    "YDES",
+    "ZLAB",
+    "ZBIO",
+    "ZNTL",
+    "ZVRA",
+    "ZURA",
+    "ZYME",
 ]
 
+
 # Sidebar controls
+
 st.sidebar.header("Screener Settings")
+
 tickers_input = st.sidebar.text_area(
     "Edit Tickers (comma separated):",
     value=", ".join(DEFAULT_TICKERS),
     height=250,
 )
 
+
 # Parse tickers
+
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
+
 tickers = list(dict.fromkeys(tickers))  # remove duplicates
+
 
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
+
 # Touch-friendly toggle switch (1 min refresh)
+
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 1 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 1 minutes",
 )
 
+
 # Refresh Data button
+
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
 )
+
 
 if refresh_btn:
   st.cache_data.clear()
@@ -140,7 +681,9 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
+
 # Maintain execution state
+
 if run_scan:
   st.session_state["is_running"] = True
 
@@ -488,11 +1031,17 @@ if st.session_state.get("is_running", False):
   clinical_rss_entries = st.session_state.get("clinical_rss_entries", [])
 
   # Metrics summary
+
   valid = df[df["Status"] == "OK"]
+
   col1, col2, col3 = st.columns(3)
+
   col1.metric("Total Scanned", len(tickers))
+
   col2.metric("Valid Data", len(valid))
+
   col3.metric("Errors / Missing", len(failed_tickers))
+
 
   if not valid.empty:
     top = valid.iloc[0]
@@ -503,8 +1052,11 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
+
   # Display interactive dataframe (with index hidden)
+
   st.subheader("📋 Stock Performance Table")
+
   st.dataframe(
       df.style.format(
           {
@@ -528,9 +1080,13 @@ if st.session_state.get("is_running", False):
       hide_index=True,
   )
 
+
   # CSV Download Button
+
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
   csv = df.to_csv(index=False).encode("utf-8")
+
   st.download_button(
       label="📥 Download Results as CSV",
       data=csv,
@@ -538,10 +1094,11 @@ if st.session_state.get("is_running", False):
       mime="text/csv",
   )
 
+
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # 1. NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED
+  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
@@ -554,7 +1111,6 @@ if st.session_state.get("is_running", False):
   # Identify tickers present in the top 400 of the performance table
   top_400_tickers = set(df.head(400)["Ticker"].str.upper().tolist())
 
-  # Using Streamlit's built-in container with height to create a native scrollable view
   with st.container(height=400):
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
@@ -563,7 +1119,6 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
-        # Check if ticker is in top 400 to set card background, keeping accent border fixed to original blue
         if ticker in top_400_tickers:
           card_bg = "#d1fae5"       # Soft light green background body
         else:
@@ -601,15 +1156,21 @@ if st.session_state.get("is_running", False):
 
   st.markdown("---")
 
+
   # ---------------------------------------------------------------------------
-  # 2. SEPARATED SWIPE TOOL (MACRO INDICATORS & SENTIMENT DASHBOARD)
+
+  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
+
   # ---------------------------------------------------------------------------
+
   tab_macro_info, tab_dashboard = st.tabs([
-      "📈 Macro & Sector Indicators", 
-      "📊 Sentiment Dashboard Visuals"
+      "📈 Macro & Sector Indicators",
+      "📊 Sentiment Dashboard Visuals",
   ])
 
-  # MACRO INFOS SECTION
+
+  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
+
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -617,23 +1178,27 @@ if st.session_state.get("is_running", False):
           f"${ibb_info['price']:.2f}",
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
-      
+
+      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
+
       ind_col1, ind_col2 = st.columns(2)
-      
-      cmf_val = ibb_info['cmf']
-      divergence_info = ibb_info['divergence_info']
-      
-      cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+
+      cmf_val = ibb_info["cmf"]
+      divergence_info = ibb_info["divergence_info"]
+
+      cmf_status = (
+          "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+      )
       cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
-      
+
       with ind_col1:
         st.metric(
-            "Chaikin Money Flow (5D)", 
-            f"{cmf_val:+.3f}", 
-            delta=cmf_status, 
-            delta_color=cmf_delta_color
+            "Chaikin Money Flow (5D)",
+            f"{cmf_val:+.3f}",
+            delta=cmf_status,
+            delta_color=cmf_delta_color,
         )
-          
+
       with ind_col2:
         if "Bullish" in divergence_info:
           div_delta_color = "normal"
@@ -641,43 +1206,61 @@ if st.session_state.get("is_running", False):
           div_delta_color = "inverse"
         else:
           div_delta_color = "off"
-          
+
         st.metric(
-            "IBB Price / CMF 5D Divergence", 
-            divergence_info, 
-            delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%", 
-            delta_color=div_delta_color
+            "IBB Price / CMF 5D Divergence",
+            divergence_info,
+            delta=f"5D Price: {ibb_info['price_5d_change']:+.2f}%",
+            delta_color=div_delta_color,
         )
 
+      # VXN Info Display under Divergence
+
       if vxn_info.get("status") == "OK":
-        vxn_val = vxn_info['price']
-        vxn_change = vxn_info['change']
-        vxn_pct = vxn_info['pct_change']
-        
+        vxn_val = vxn_info["price"]
+        vxn_change = vxn_info["change"]
+        vxn_pct = vxn_info["pct_change"]
+
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
-        
+
         st.metric(
             "CBOE NASDAQ Volatility Index (^VXN)",
             f"{vxn_val:.2f}",
             f"{vxn_change:+.2f} ({vxn_pct:+.2f}%)",
-            delta_color=vxn_delta_color
+            delta_color=vxn_delta_color,
         )
       else:
-        st.warning("Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo Finance.")
+        st.warning(
+            "Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo"
+            " Finance."
+        )
+
+      # Rewritten Strategy Logic explanatory text
 
       st.markdown(
-          "<p style='font-size:11px; color:#6c757d; margin-top:-5px; margin-bottom:15px;'>"
-          "💡 <b>Strategy Logic:</b> Dynamic multi-factor regime filter leveraging IBB sector momentum, institutional liquidity via CMF flow, and ^VXN volatility boundaries. "
-          "<b>Long Bias:</b> Activated during positive institutional accumulation (CMF > 0 or Bullish Divergence) combined with subdued or downward-trending volatility (^VXN), favoring aggressive small-to-mid cap biotech momentum plays. "
-          "<b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF < 0 or Bearish Divergence) paired with expanding ^VXN volatility, indicating macro risk-off pressure and favoring defensive capital preservation or tactical short exposure. "
-          "<b>Execution Filter:</b> The composite sentiment score and breadth metrics below act as the final mandatory gateway to filter out false breakouts before order routing."
-          "</p>",
-          unsafe_allow_html=True
+          "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
+          " margin-bottom:15px;'>💡 <b>Strategy Logic:</b> Dynamic"
+          " multi-factor regime filter leveraging IBB sector momentum,"
+          " institutional liquidity via CMF flow, and ^VXN volatility"
+          " boundaries. <b>Long Bias:</b> Activated during positive"
+          " institutional accumulation (CMF > 0 or Bullish Divergence) combined"
+          " with subdued or downward-trending volatility (^VXN), favoring"
+          " aggressive small-to-mid cap biotech momentum plays."
+          " <b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF <"
+          " 0 or Bearish Divergence) paired with expanding ^VXN volatility,"
+          " indicating macro risk-off pressure and favoring defensive capital"
+          " preservation or tactical short exposure. <b>Execution Filter:</b>"
+          " The composite sentiment score and breadth metrics below act as the"
+          " final mandatory gateway to filter out false breakouts before order"
+          " routing.</p>",
+          unsafe_allow_html=True,
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
-  # SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
+
+  # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
+
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
@@ -736,6 +1319,7 @@ if st.session_state.get("is_running", False):
           ax.set_axisbelow(True)
 
         # Panel 1
+
         ax_score.set_title(
             "1. Composite Sentiment Score",
             fontsize=12,
@@ -781,7 +1365,9 @@ if st.session_state.get("is_running", False):
         ax_score.set_ylim(-0.8, 0.85)
         ax_score.set_yticks([])
         ax_score.set_xticks([-100, -60, -30, 0, 30, 60, 100])
-        ax_score.set_xlabel(f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8)
+        ax_score.set_xlabel(
+            f"Score: {score:+.2f} / 100", fontsize=9, labelpad=8
+        )
         ax_score.text(
             0.5,
             0.94,
@@ -798,6 +1384,7 @@ if st.session_state.get("is_running", False):
           spine.set_visible(False)
 
         # Panel 2
+
         ax_breadth.set_title(
             "2. Market Breadth",
             fontsize=12,
@@ -836,6 +1423,7 @@ if st.session_state.get("is_running", False):
           ax_breadth.spines[spine].set_visible(False)
 
         # Panel 3
+
         ax_summary.set_title(
             "3. Sector Summary",
             fontsize=12,
@@ -904,6 +1492,7 @@ if st.session_state.get("is_running", False):
         )
 
         # Panel 4
+
         ax_distribution.set_title(
             "4. Daily Return Distribution",
             fontsize=12,
@@ -950,7 +1539,9 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
+
   # Auto-refresh logic
+
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 1 minute...")
     time.sleep(60)
@@ -958,6 +1549,7 @@ if st.session_state.get("is_running", False):
     if "df_results" in st.session_state:
       del st.session_state["df_results"]
     st.rerun()
+
 else:
   st.info(
       "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
