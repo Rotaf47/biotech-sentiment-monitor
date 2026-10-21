@@ -557,7 +557,10 @@ auto_refresh = st.sidebar.toggle(
 low_float_filter = st.sidebar.toggle(
     "🎯 Low Float Filter (< $50M)",
     value=False,
-    help="Filters the scanned results to only show stocks with a share float under 50M",
+    help=(
+        "Filters the scanned results and RSS news feed to only show stocks with"
+        " a share float under 50M"
+    ),
 )
 
 
@@ -679,12 +682,7 @@ def fetch_screener_data(ticker_list):
       vol_str = stock_info.get("Volume", "0").replace(",", "")
       volume = float(vol_str) if vol_str.isdigit() else 0
 
-      # Extract float from Finviz if available (e.g., "12.45M" or "850K")
-      float_str = stock_info.get("Shs Outstand", stock_info.get("Shs Float", "0"))
-      # For safety, fallback parsing or use direct Finviz keys if present:
-      # Finviz usually keys float as "Shs Float"
       float_raw = stock_info.get("Shs Float", "0")
-      
       float_shares = 0.0
       if float_raw:
         float_raw = float_raw.upper().strip()
@@ -712,7 +710,6 @@ def fetch_screener_data(ticker_list):
   if missing_tickers:
     yf_data, yf_failed = fetch_yfinance_fallback(missing_tickers)
     for t, dat in yf_data.items():
-      # yfinance fallback doesn't pull float easily, assign 0 or handle
       dat["Float"] = 0.0
       price_data[t] = dat
     failed_tickers.extend(yf_failed)
@@ -952,8 +949,16 @@ if st.session_state.get("is_running", False):
 
   # Apply Low Float Filter if toggled on
   if low_float_filter:
-    # Filter for valid status and float > 0 up to 50M shares
-    df = df[(df["Status"] != "OK") | ((df["Float"] > 0) & (df["Float"] <= 50_000_000))]
+    df = df[
+        (df["Status"] != "OK")
+        | ((df["Float"] > 0) & (df["Float"] <= 50_000_000))
+    ]
+
+    # Filter RSS feed entries to only show items matching valid low-float tickers in the screener
+    allowed_tickers = set(df[df["Status"] == "OK"]["Ticker"])
+    clinical_rss_entries = [
+        entry for entry in clinical_rss_entries if entry["ticker"] in allowed_tickers
+    ]
 
   df = df.sort_values(
       by="Daily Change (%)", ascending=False, na_position="last"
@@ -1007,7 +1012,11 @@ if st.session_state.get("is_running", False):
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
               "RVOL": "{:.2f}x",
-              "Float": lambda x: f"{x/1e6:.2f}M" if pd.notnull(x) and x > 0 else "N/A",
+              "Float": (
+                  lambda x: f"{x/1e6:.2f}M"
+                  if pd.notnull(x) and x > 0
+                  else "N/A"
+              ),
           },
           na_rep="N/A",
       ),
@@ -1046,12 +1055,13 @@ if st.session_state.get("is_running", False):
   st.markdown("### 🔬 StockTitan Clinical Trials & FDA Approvals RSS Feed")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Combined live feed tracking real-time clinical trial announcements and FDA approval updates."
+      "Combined live feed tracking real-time clinical trial announcements and"
+      " FDA approval updates."
       "</p>",
-      unsafe_allow_html=True
+      unsafe_allow_html=True,
   )
-  
-  current_entry_links = {entry['link'] for entry in clinical_rss_entries}
+
+  current_entry_links = {entry["link"] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
     has_new_rss_cards = False
@@ -1076,12 +1086,12 @@ if st.session_state.get("is_running", False):
   with st.container(height=400):
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
-        ticker = entry['ticker']
-        description = entry['description']
-        link = entry['link']
-        published = entry['published']
-        feed_tag = entry['feed_tag']
-        
+        ticker = entry["ticker"]
+        description = entry["description"]
+        link = entry["link"]
+        published = entry["published"]
+        feed_tag = entry["feed_tag"]
+
         if ticker in advancing_tickers_pct:
           change_pct = advancing_tickers_pct[ticker]
           if change_pct >= 20.0:
@@ -1094,11 +1104,17 @@ if st.session_state.get("is_running", False):
             card_bg = "#d1fae5"
         else:
           card_bg = "#ffffff"
-        
+
         border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"
-        
-        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
-        
+
+        pub_badge = (
+            f"<span style='background-color: #f1f3f5; color: #495057;"
+            f" padding: 2px 6px; border-radius: 4px; font-size: 9px; float:"
+            f" right;'>🕒 {published}</span>"
+            if published
+            else ""
+        )
+
         card_html = f"""
         <div style="
             background-color: {card_bg}; 
@@ -1121,8 +1137,10 @@ if st.session_state.get("is_running", False):
         st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feeds.</p>",
-          unsafe_allow_html=True
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or"
+          " unable to fetch the RSS feeds matching the current low float"
+          " filter.</p>",
+          unsafe_allow_html=True,
       )
 
   st.markdown("---")
