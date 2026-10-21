@@ -147,6 +147,7 @@ if run_scan:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
+  """Completions missing regular session data via Alpaca Snapshots."""
   from alpaca.data.enums import DataFeed
   from alpaca.data.historical import StockHistoricalDataClient
   from alpaca.data.requests import StockSnapshotRequest
