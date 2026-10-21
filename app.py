@@ -658,12 +658,12 @@ tickers = list(dict.fromkeys(tickers))  # remove duplicates
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
 
-# Touch-friendly toggle switch (1 min refresh)
+# Touch-friendly toggle switch (3 min refresh)
 
 auto_refresh = st.sidebar.toggle(
-    "🔄 Enable 1 min Auto-Refresh",
+    "🔄 Enable 3 min Auto-Refresh",
     value=False,
-    help="Automatically re-runs the screener every 1 minutes",
+    help="Automatically re-runs the screener every 3 minutes",
 )
 
 
@@ -1572,8 +1572,8 @@ if st.session_state.get("is_running", False):
   # Auto-refresh logic
 
   if auto_refresh:
-    st.info("⏳ Auto-refreshing in 1 minute...")
-    time.sleep(60)
+    st.info("⏳ Auto-refreshing in 3 minute...")
+    time.sleep(180)
     st.cache_data.clear()
     if "df_results" in st.session_state:
       del st.session_state["df_results"]
