@@ -278,62 +278,44 @@ def fetch_ibb_data():
   try:
     ibb = yf.Ticker("IBB")
     hist = ibb.history(period="1mo")
-    if hist.empty or "Close" not in hist.columns:
-      return {"status": "Error"}
-    
-    # Drop rows where Close is NaN to prevent nan outputs
-    hist = hist.dropna(subset=["Close"])
-    if len(hist) < 5:
-      return {"status": "Error"}
+    if len(hist) >= 5:
+      prev_close = float(hist["Close"].iloc[-2])
+      latest_close = float(hist["Close"].iloc[-1])
+      change = latest_close - prev_close
+      pct_change = (change / prev_close) * 100
 
-    close_series = hist["Close"].squeeze()
-    if isinstance(close_series, pd.DataFrame):
-      close_series = close_series.iloc[:, 0]
+      high = hist["High"]
+      low = hist["Low"]
+      close = hist["Close"]
+      vol = hist["Volume"]
 
-    high_series = hist["High"].squeeze()
-    if isinstance(high_series, pd.DataFrame):
-      high_series = high_series.iloc[:, 0]
+      range_hl = high - low
+      multiplier = ((close - low) - (high - close)) / range_hl.replace(0, np.nan)
+      multiplier = multiplier.fillna(0)
 
-    low_series = hist["Low"].squeeze()
-    if isinstance(low_series, pd.DataFrame):
-      low_series = low_series.iloc[:, 0]
+      mf_volume = multiplier * vol
+      cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
 
-    vol_series = hist["Volume"].squeeze()
-    if isinstance(vol_series, pd.DataFrame):
-      vol_series = vol_series.iloc[:, 0]
+      price_5d_change = float(
+          ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
+      )
 
-    prev_close = float(close_series.iloc[-2])
-    latest_close = float(close_series.iloc[-1])
-    change = latest_close - prev_close
-    pct_change = (change / prev_close) * 100 if prev_close != 0 else 0.0
+      if price_5d_change < 0 and cmf_5 >= 0:
+        divergence_info = "Bullish Div"
+      elif price_5d_change > 0 and cmf_5 < 0:
+        divergence_info = "Bearish Div"
+      else:
+        divergence_info = "Neutral"
 
-    range_hl = high_series - low_series
-    multiplier = ((close_series - low_series) - (high_series - close_series)) / range_hl.replace(0, np.nan)
-    multiplier = multiplier.fillna(0)
-
-    mf_volume = multiplier * vol_series
-    cmf_5 = float(mf_volume.tail(5).sum() / vol_series.tail(5).sum()) if vol_series.tail(5).sum() != 0 else 0.0
-
-    price_5d_change = float(
-        ((close_series.iloc[-1] - close_series.iloc[-5]) / close_series.iloc[-5]) * 100
-    )
-
-    if price_5d_change < 0 and cmf_5 >= 0:
-      divergence_info = "Bullish Div"
-    elif price_5d_change > 0 and cmf_5 < 0:
-      divergence_info = "Bearish Div"
-    else:
-      divergence_info = "Neutral"
-
-    return {
-        "price": latest_close,
-        "change": change,
-        "pct_change": pct_change,
-        "cmf": cmf_5,
-        "price_5d_change": price_5d_change,
-        "divergence_info": divergence_info,
-        "status": "OK",
-    }
+      return {
+          "price": latest_close,
+          "change": change,
+          "pct_change": pct_change,
+          "cmf": cmf_5,
+          "price_5d_change": price_5d_change,
+          "divergence_info": divergence_info,
+          "status": "OK",
+      }
   except Exception:
     pass
   return {"status": "Error"}
@@ -344,19 +326,11 @@ def fetch_vxn_data():
   try:
     vxn = yf.Ticker("^VXN")
     hist = vxn.history(period="1mo")
-    if hist.empty or "Close" not in hist.columns:
-      return {"status": "Error"}
-    
-    hist = hist.dropna(subset=["Close"])
     if len(hist) >= 2:
-      close_series = hist["Close"].squeeze()
-      if isinstance(close_series, pd.DataFrame):
-        close_series = close_series.iloc[:, 0]
-
-      prev_close = float(close_series.iloc[-2])
-      latest_close = float(close_series.iloc[-1])
+      prev_close = float(hist["Close"].iloc[-2])
+      latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
-      pct_change = (change / prev_close) * 100 if prev_close != 0 else 0.0
+      pct_change = (change / prev_close) * 100
 
       return {
           "price": latest_close,
