@@ -1108,12 +1108,10 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  # Identify advancing stock tickers with daily change strictly above 5%
-  advancing_tickers = set(
-      df[(df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)]["Ticker"]
-      .str.upper()
-      .tolist()
-  )
+  # Map advancing stock tickers with daily change > 5% to their change percentage
+  advancing_tickers_pct = df[
+      (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
+  ].set_index("Ticker")["Daily Change (%)"].to_dict()
 
   with st.container(height=400):
     if clinical_rss_entries:
@@ -1123,11 +1121,19 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
-        # Highlight in soft green if the entry ticker is an advancing stock above 5%
-        if ticker in advancing_tickers:
-          card_bg = "#d1fae5"       # Soft light green background body
+        # Determine background color gradient: the higher above 5%, the deeper green the card
+        if ticker in advancing_tickers_pct:
+          change_pct = advancing_tickers_pct[ticker]
+          if change_pct >= 20.0:
+            card_bg = "#6ee7b7"  # Deep vivid green (20%+)
+          elif change_pct >= 15.0:
+            card_bg = "#86efac"  # Medium-dark green (15% - 20%)
+          elif change_pct >= 10.0:
+            card_bg = "#a7f3d0"  # Medium green (10% - 15%)
+          else:
+            card_bg = "#d1fae5"  # Soft light green (5% - 10%)
         else:
-          card_bg = "#ffffff"       # Default white body background
+          card_bg = "#ffffff"     # Default white body background
         
         border_color = "#3b82f6"    # Original default blue accent border
         
