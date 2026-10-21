@@ -19,7 +19,7 @@ st.title("🧬 BSM")
 
 st.markdown(
     "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
-    " visualizes market sentiment."
+    " visualizes market sentiment (Filtered to >5% Advancers)."
 )
 
 
@@ -1013,6 +1013,10 @@ if st.session_state.get("is_running", False):
     })
 
   df = pd.DataFrame(results)
+  
+  # Filter strictly for stocks with an advancement greater than 5%
+  df = df[(df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)].copy()
+
   df = df.sort_values(
       by="Daily Change (%)", ascending=False, na_position="last"
   ).reset_index(drop=True)
@@ -1032,30 +1036,28 @@ if st.session_state.get("is_running", False):
 
   # Metrics summary
 
-  valid = df[df["Status"] == "OK"]
-
   col1, col2, col3 = st.columns(3)
 
   col1.metric("Total Scanned", len(tickers))
 
-  col2.metric("Valid Data", len(valid))
+  col2.metric("Filtered >5% Advancers", len(df))
 
   col3.metric("Errors / Missing", len(failed_tickers))
 
 
-  if not valid.empty:
-    top = valid.iloc[0]
-    bottom = valid.iloc[-1]
+  if not df.empty:
+    top = df.iloc[0]
+    bottom = df.iloc[-1]
     st.success(
-        f"🚀 **Top Gainer:** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
-        f" 📉 **Bottom Performer:** {bottom['Ticker']}"
+        f"🚀 **Top Gainer (>5%):** {top['Ticker']} ({top['Daily Change (%)']:+.2f}%) &"
+        f" 📉 **Lowest >5% Gainer:** {bottom['Ticker']}"
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
 
   # Display interactive dataframe (with index hidden)
 
-  st.subheader("📋 Stock Performance Table")
+  st.subheader("📋 Stock Performance Table (>5% Advancers Only)")
 
   st.dataframe(
       df.style.format(
@@ -1090,7 +1092,7 @@ if st.session_state.get("is_running", False):
   st.download_button(
       label="📥 Download Results as CSV",
       data=csv,
-      file_name=f"biotech_daily_screener_{timestamp}.csv",
+      file_name=f"biotech_daily_screener_above_5pct_{timestamp}.csv",
       mime="text/csv",
   )
 
@@ -1100,7 +1102,7 @@ if st.session_state.get("is_running", False):
   # ---------------------------------------------------------------------------
   # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (PLACED BETWEEN TABLE & SWIPE TOOL)
   # ---------------------------------------------------------------------------
-  st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
+  st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed (>5% Advancers Highlighted)")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
       "Live feed tracking real-time clinical trial announcements and updates."
@@ -1108,9 +1110,9 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  # Identify advancing stock tickers using the dashboard breadth logic (Status OK & Daily Change > 0)
+  # Identify advancing stock tickers strictly above 5% advancement
   advancing_tickers = set(
-      df[(df["Status"] == "OK") & (df["Daily Change (%)"] > 0)]["Ticker"]
+      df[df["Daily Change (%)"] > 5.0]["Ticker"]
       .str.upper()
       .tolist()
   )
@@ -1123,7 +1125,7 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
-        # Highlight in soft green if the entry ticker is an advancing stock
+        # Highlight in soft green if the entry ticker is an advancing stock > 5%
         if ticker in advancing_tickers:
           card_bg = "#d1fae5"       # Soft light green background body
         else:
@@ -1266,7 +1268,7 @@ if st.session_state.get("is_running", False):
   # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
 
   with tab_dashboard:
-    clean_df = df[df["Status"] == "OK"].copy()
+    clean_df = df.copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
       returns = pd.to_numeric(
           clean_df["Daily Change (%)"], errors="coerce"
@@ -1278,9 +1280,9 @@ if st.session_state.get("is_running", False):
         decliners = int((returns < 0).sum())
         unchanged = int((returns == 0).sum())
 
-        advance_pct = advancers / total * 100
-        decline_pct = decliners / total * 100
-        unchanged_pct = unchanged / total * 100
+        advance_pct = advancers / total * 100 if total > 0 else 0
+        decline_pct = decliners / total * 100 if total > 0 else 0
+        unchanged_pct = unchanged / total * 100 if total > 0 else 0
 
         median_return = float(returns.median())
         mean_return = float(returns.mean())
@@ -1315,7 +1317,7 @@ if st.session_state.get("is_running", False):
         ax_distribution = fig.add_subplot(gs[1, 1])
 
         fig.suptitle(
-            "BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18, fontweight="bold"
+            "BIOTECH SECTOR SENTIMENT DASHBOARD (>5% ADVANCERS)", fontsize=18, fontweight="bold"
         )
 
         for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
@@ -1485,7 +1487,7 @@ if st.session_state.get("is_running", False):
         ax_summary.text(
             0.05,
             0.36,
-            f"Stocks analyzed: {total}\nAdvancers: {advancers}"
+            f"Stocks analyzed (>5%): {total}\nAdvancers: {advancers}"
             f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
             f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
             f" return: {mean_return:+.2f}%",
@@ -1514,11 +1516,11 @@ if st.session_state.get("is_running", False):
             alpha=0.88,
         )
         ax_distribution.axvline(
-            0,
+            5,
             color="#343a40",
             linestyle="--",
             linewidth=1.2,
-            label="Zero return",
+            label="5% Threshold",
         )
         ax_distribution.axvline(
             median_return,
