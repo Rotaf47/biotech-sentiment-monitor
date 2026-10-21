@@ -1482,36 +1482,46 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (MOVED TO BOTTOM)
+  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (ORDERED BY ADVANCEMENT)
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Live feed tracking real-time clinical trial announcements and updates."
+      "Live feed tracking real-time clinical trial announcements and updates, ordered by advancing performance."
       "</p>",
       unsafe_allow_html=True
   )
   
-  # Identify advancing stock tickers using the dashboard breadth logic (Status OK & Daily Change > 0)
-  advancing_tickers = set(
-      df[(df["Status"] == "OK") & (df["Daily Change (%)"] > 0)]["Ticker"]
-      .str.upper()
-      .tolist()
+  # Map tickers to their daily change (%) from valid screener results
+  valid_df = df[df["Status"] == "OK"]
+  ticker_change_map = dict(zip(valid_df["Ticker"].str.upper(), valid_df["Daily Change (%)"]))
+
+  # Attach daily change value to each RSS entry
+  for entry in clinical_rss_entries:
+    t_symbol = entry["ticker"].upper()
+    entry["daily_change"] = ticker_change_map.get(t_symbol, -999.0)
+
+  # Sort entries so advancing entries (>0%) come first, ordered highest to lowest change
+  sorted_rss_entries = sorted(
+      clinical_rss_entries, key=lambda x: x["daily_change"], reverse=True
   )
 
   with st.container(height=400):
-    if clinical_rss_entries:
-      for entry in clinical_rss_entries:
+    if sorted_rss_entries:
+      for entry in sorted_rss_entries:
         ticker = entry['ticker']
         description = entry['description']
         link = entry['link']
         published = entry['published']
+        daily_change = entry['daily_change']
         
-        # Highlight in soft green if the entry ticker is an advancing stock
-        if ticker in advancing_tickers:
+        # Highlight advancing stocks (>0%) in soft green
+        if daily_change > 0:
           card_bg = "#d1fae5"       # Soft light green background body
+          change_badge = f"<span style='background-color: #10b981; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; margin-left: 6px;'>+{daily_change:.2f}%</span>"
         else:
           card_bg = "#ffffff"       # Default white body background
+          change_badge = ""
         
         border_color = "#3b82f6"    # Original default blue accent border
         
@@ -1530,6 +1540,7 @@ if st.session_state.get("is_running", False):
             <div style="margin-bottom: 6px;">
                 {pub_badge}
                 <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
+                {change_badge}
             </div>
             <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
                 <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
