@@ -1,7 +1,7 @@
 from datetime import datetime
 import time
 import feedparser
-from finviz.stock import Stock
+import finviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -661,11 +661,10 @@ def fetch_finviz_fallback(missing_tickers):
 
   for ticker in missing_tickers:
     try:
-      stock_info = Stock(ticker)
-      data = stock_info.ticker_data
-      price = float(data.get("Price", 0))
-      prev_close = float(data.get("Prev Close", price))
-      vol_str = data.get("Volume", "0").replace(",", "")
+      stock_info = finviz.get_stock(ticker)
+      price = float(stock_info.get("Price", 0))
+      prev_close = float(stock_info.get("Prev Close", price))
+      vol_str = stock_info.get("Volume", "0").replace(",", "")
       volume = float(vol_str) if vol_str.isdigit() else 0
 
       if price > 0 and prev_close > 0:
