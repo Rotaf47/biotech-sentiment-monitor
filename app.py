@@ -1108,6 +1108,25 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
+  # Check for new items compared to previously stored session entries and trigger a single beep sound alert via HTML5 Audio
+  current_entry_links = {entry['link'] for entry in clinical_rss_entries}
+  if "last_seen_rss_links" not in st.session_state:
+    st.session_state["last_seen_rss_links"] = current_entry_links
+    has_new_rss_cards = False
+  else:
+    new_links = current_entry_links - st.session_state["last_seen_rss_links"]
+    has_new_rss_cards = len(new_links) > 0
+    if has_new_rss_cards:
+      st.session_state["last_seen_rss_links"] = current_entry_links
+
+  if has_new_rss_cards:
+    beep_audio_html = """
+    <audio autoplay>
+      <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    </audio>
+    """
+    st.markdown(beep_audio_html, unsafe_allow_html=True)
+
   # Map advancing stock tickers with daily change > 5% to their change percentage
   advancing_tickers_pct = df[
       (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
