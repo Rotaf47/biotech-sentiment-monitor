@@ -1482,7 +1482,7 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (ORDERED BY ADVANCEMENT)
+  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (FULLY FIXED)
   # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
   st.markdown(
@@ -1523,30 +1523,22 @@ if st.session_state.get("is_running", False):
           card_bg = "#ffffff"       # Default white body background
           change_badge = ""
         
-        border_color = "#3b82f6"    # Original default blue accent border
+        border_color = "#3b82f6"    # Default blue accent border
         
         pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
-        card_html = f"""
-        <div style="
-            background-color: {card_bg}; 
-            border: 1px solid #e2e8f0; 
-            border-left: 4px solid {border_color}; 
-            padding: 12px 14px; 
-            margin-bottom: 12px; 
-            border-radius: 6px; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        ">
-            <div style="margin-bottom: 6px;">
-                {pub_badge}
-                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
-                {change_badge}
-            </div>
-            <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
-                <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
-            </div>
-        </div>
-        """
+        # Unindented single string template to prevent Streamlit from creating code blocks
+        card_html = (
+            f'<div style="background-color: {card_bg}; border: 1px solid #e2e8f0; '
+            f'border-left: 4px solid {border_color}; padding: 12px 14px; margin-bottom: 12px; '
+            f'border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">'
+            f'<div style="margin-bottom: 6px;">{pub_badge}'
+            f'<span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>'
+            f'{change_badge}</div>'
+            f'<div style="font-size: 12px; font-weight: 500; line-height: 1.4;">'
+            f'<a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>'
+            f'</div></div>'
+        )
         st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
