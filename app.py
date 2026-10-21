@@ -16,8 +16,8 @@ st.set_page_config(
 st.title("🧬 BSM")
 
 st.markdown(
-    "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
-    " visualizes market sentiment using Finviz fallback."
+    "Scans live biotech tickers via Finviz, ranks daily performance, and"
+    " visualizes market sentiment."
 )
 
 # Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
@@ -654,12 +654,12 @@ if run_scan:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_finviz_fallback(missing_tickers):
-  """Completes missing regular session data via Finviz scraping."""
-  finviz_data = {}
-  failed_list = []
+def fetch_finviz_screener_data(ticker_list):
+  """Fetches ticker quotes exclusively via Finviz scraping."""
+  price_data = {}
+  failed_tickers = []
 
-  for ticker in missing_tickers:
+  for ticker in ticker_list:
     try:
       stock_info = finviz.get_stock(ticker)
       price = float(stock_info.get("Price", 0))
@@ -668,72 +668,15 @@ def fetch_finviz_fallback(missing_tickers):
       volume = float(vol_str) if vol_str.isdigit() else 0
 
       if price > 0 and prev_close > 0:
-        finviz_data[ticker] = pd.DataFrame({
-            "Close": [prev_close, price],
-            "Volume": [volume, volume],
-        })
+        price_data[ticker] = {
+            "Previous Close ($)": prev_close,
+            "Latest Close ($)": price,
+            "Volume": volume,
+        }
       else:
-        failed_list.append((ticker, "Incomplete Finviz data"))
+        failed_tickers.append((ticker, "Incomplete Finviz data"))
     except Exception as e:
-      failed_list.append((ticker, f"Finviz error: {type(e).__name__}"))
-
-  return finviz_data, failed_list
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_screener_data(ticker_list):
-  price_data = {}
-  failed_tickers = []
-  missing_tickers = []
-
-  batch_size = 50
-  for i in range(0, len(ticker_list), batch_size):
-    batch = ticker_list[i : i + batch_size]
-    try:
-      data = yf.download(
-          batch,
-          period="3mo",
-          interval="1d",
-          auto_adjust=False,
-          group_by="ticker",
-          threads=True,
-          progress=False,
-      )
-
-      for ticker in batch:
-        try:
-          if len(batch) == 1:
-            hist = data
-          else:
-            if ticker in data.columns.levels[0]:
-              hist = data[ticker]
-            else:
-              missing_tickers.append(ticker)
-              continue
-
-          if (
-              hist.empty
-              or "Close" not in hist.columns
-              or "Volume" not in hist.columns
-          ):
-            missing_tickers.append(ticker)
-            continue
-
-          clean_hist = hist[["Close", "Volume"]].dropna(subset=["Close"])
-          if len(clean_hist) < 2:
-            missing_tickers.append(ticker)
-            continue
-
-          price_data[ticker] = clean_hist
-        except Exception:
-          missing_tickers.append(ticker)
-    except Exception:
-      missing_tickers.extend(batch)
-
-  if missing_tickers:
-    finviz_data, finviz_failed = fetch_finviz_fallback(missing_tickers)
-    price_data.update(finviz_data)
-    failed_tickers.extend(finviz_failed)
+      failed_tickers.append((ticker, f"Finviz error: {type(e).__name__}"))
 
   return price_data, failed_tickers
 
@@ -866,8 +809,8 @@ def fetch_stocktitan_combined_rss():
 
 
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data..."):
-    price_data, failed_tickers = fetch_screener_data(tickers)
+  with st.spinner("Fetching live market data via Finviz..."):
+    price_data, failed_tickers = fetch_finviz_screener_data(tickers)
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
     clinical_rss_entries = fetch_stocktitan_combined_rss()
@@ -889,33 +832,9 @@ if st.session_state.get("is_running", False):
       })
       continue
 
-    df_hist = price_data[ticker]
-    prices = df_hist["Close"].dropna()
-    volumes = df_hist["Volume"].fillna(0)
-
-    if len(prices) < 2:
-      results.append({
-          "Ticker": ticker,
-          "Previous Close ($)": None,
-          "Latest Close ($)": None,
-          "Change ($)": None,
-          "Daily Change (%)": None,
-          "RVOL": None,
-          "Overview": overview_url,
-          "Status": "Insufficient history",
-      })
-      continue
-
-    previous_close = float(prices.iloc[-2])
-    latest_close = float(prices.iloc[-1])
-    latest_volume = float(volumes.iloc[-1])
-
-    if len(volumes) > 1:
-      avg_volume = float(volumes.iloc[:-1].tail(63).mean())
-    else:
-      avg_volume = 0
-
-    rvol = (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
+    stock_info = price_data[ticker]
+    previous_close = stock_info["Previous Close ($)"]
+    latest_close = stock_info["Latest Close ($)"]
 
     if previous_close == 0:
       results.append({
@@ -924,7 +843,7 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "RVOL": rvol,
+          "RVOL": None,
           "Overview": overview_url,
           "Status": "Invalid previous close",
       })
@@ -939,7 +858,7 @@ if st.session_state.get("is_running", False):
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
-        "RVOL": rvol,
+        "RVOL": None,  # Finviz basic page doesn't track historical intraday rolling average volume arrays natively
         "Overview": overview_url,
         "Status": "OK",
     })
@@ -989,7 +908,7 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
-              "RVOL": "{:.2f}x",
+              "RVOL": "{}",
           },
           na_rep="N/A",
       ),
