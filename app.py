@@ -1108,7 +1108,7 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  # Check for new items compared to previously stored session entries and trigger a single bell chime alert via HTML5 Audio
+  # Check for new items compared to previously stored session entries and trigger the jingle bells sound alert once
   current_entry_links = {entry['link'] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
@@ -1120,12 +1120,12 @@ if st.session_state.get("is_running", False):
       st.session_state["last_seen_rss_links"] = current_entry_links
 
   if has_new_rss_cards:
-    bell_audio_html = """
+    audio_html = """
     <audio autoplay>
-      <source src="https://actions.google.com/sounds/v1/household/doorbell_chime.ogg" type="audio/ogg">
+      <source src="https://actions.google.com/sounds/v1/cartoon/jingle_bells.ogg" type="audio/ogg">
     </audio>
     """
-    st.markdown(bell_audio_html, unsafe_allow_html=True)
+    st.markdown(audio_html, unsafe_allow_html=True)
 
   # Map advancing stock tickers with daily change > 5% to their change percentage
   advancing_tickers_pct = df[
