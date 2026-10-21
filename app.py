@@ -1,45 +1,26 @@
 from datetime import datetime
 import time
 import feedparser
+from finviz.main import get_stock
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
 
-
 # Page Configuration
-
 st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
-
 
 st.title("🧬 BSM")
 
 st.markdown(
     "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
-    " visualizes market sentiment."
+    " visualizes market sentiment using Finviz fallback."
 )
-
-
-# Sidebar controls for Alpaca API Credentials
-
-st.sidebar.header("Alpaca API Settings")
-
-alpaca_api_key = st.sidebar.text_input(
-    "Alpaca API Key", value="PKKUDHFXLGCRECNPFHWFINVFZY", type="password"
-)
-
-alpaca_secret_key = st.sidebar.text_input(
-    "Alpaca Secret Key",
-    value="3Lo3FMU1TdEbvYQzAZ5XMLFre7bmzd1Lp9fDJ6PJ2czx",
-    type="password",
-)
-
 
 # Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
-
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -636,9 +617,7 @@ DEFAULT_TICKERS = [
     "ZYME",
 ]
 
-
 # Sidebar controls
-
 st.sidebar.header("Screener Settings")
 
 tickers_input = st.sidebar.text_area(
@@ -647,18 +626,11 @@ tickers_input = st.sidebar.text_area(
     height=250,
 )
 
-
 # Parse tickers
-
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-
 tickers = list(dict.fromkeys(tickers))  # remove duplicates
 
-
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
-
-
-# Touch-friendly toggle switch (3 min refresh)
 
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 3 min Auto-Refresh",
@@ -666,14 +638,10 @@ auto_refresh = st.sidebar.toggle(
     help="Automatically re-runs the screener every 3 minutes",
 )
 
-
-# Refresh Data button
-
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
 )
-
 
 if refresh_btn:
   st.cache_data.clear()
@@ -681,84 +649,39 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
-
-# Maintain execution state
-
 if run_scan:
   st.session_state["is_running"] = True
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_alpaca_fallback(missing_tickers, api_key, secret_key):
-  """Completions missing regular session data via Alpaca Snapshots."""
-  from alpaca.data.enums import DataFeed
-  from alpaca.data.historical import StockHistoricalDataClient
-  from alpaca.data.requests import StockSnapshotRequest
-
-  alpaca_data = {}
+def fetch_finviz_fallback(missing_tickers):
+  """Completes missing regular session data via Finviz scraping."""
+  finviz_data = {}
   failed_list = []
 
-  if not missing_tickers or not api_key or not secret_key:
-    return alpaca_data, missing_tickers
+  for ticker in missing_tickers:
+    try:
+      stock_info = get_stock(ticker)
+      price = float(stock_info.get("Price", 0))
+      prev_close = float(stock_info.get("Prev Close", price))
+      vol_str = stock_info.get("Volume", "0").replace(",", "")
+      volume = float(vol_str) if vol_str.isdigit() else 0
 
-  try:
-    client = StockHistoricalDataClient(api_key, secret_key)
-    batch_size = 50
+      if price > 0 and prev_close > 0:
+        finviz_data[ticker] = pd.DataFrame({
+            "Close": [prev_close, price],
+            "Volume": [volume, volume],
+        })
+      else:
+        failed_list.append((ticker, "Incomplete Finviz data"))
+    except Exception as e:
+      failed_list.append((ticker, f"Finviz error: {type(e).__name__}"))
 
-    for i in range(0, len(missing_tickers), batch_size):
-      batch = missing_tickers[i : i + batch_size]
-      try:
-        request_params = StockSnapshotRequest(
-            symbol_or_symbols=batch, feed=DataFeed.IEX
-        )
-        snapshots = client.get_stock_snapshot(request_params)
-
-        for ticker in batch:
-          if ticker in snapshots and snapshots[ticker]:
-            snap = snapshots[ticker]
-            prev_close = (
-                snap.previous_daily_bar.close
-                if snap.previous_daily_bar
-                else None
-            )
-            latest_price = (
-                snap.latest_trade.price
-                if snap.latest_trade
-                else (
-                    snap.daily_bar.close
-                    if snap.daily_bar
-                    else (
-                        snap.minute_bar.close if snap.minute_bar else None
-                    )
-                )
-            )
-            latest_volume = (
-                snap.daily_bar.volume
-                if snap.daily_bar
-                else (snap.minute_bar.volume if snap.minute_bar else 0)
-            )
-
-            if prev_close and latest_price:
-              alpaca_data[ticker] = pd.DataFrame({
-                  "Close": [prev_close, latest_price],
-                  "Volume": [latest_volume, latest_volume],
-              })
-            else:
-              failed_list.append((ticker, "Incomplete Alpaca snapshot price"))
-          else:
-            failed_list.append((ticker, "No snapshot data on Alpaca"))
-      except Exception as e:
-        for ticker in batch:
-          failed_list.append((ticker, f"Alpaca batch error: {type(e).__name__}"))
-  except Exception as e:
-    for ticker in missing_tickers:
-      failed_list.append((ticker, f"Alpaca init error: {type(e).__name__}"))
-
-  return alpaca_data, failed_list
+  return finviz_data, failed_list
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_screener_data(ticker_list, api_key, secret_key):
+def fetch_screener_data(ticker_list):
   price_data = {}
   failed_tickers = []
   missing_tickers = []
@@ -808,11 +731,9 @@ def fetch_screener_data(ticker_list, api_key, secret_key):
       missing_tickers.extend(batch)
 
   if missing_tickers:
-    alpaca_data, alpaca_failed = fetch_alpaca_fallback(
-        missing_tickers, api_key, secret_key
-    )
-    price_data.update(alpaca_data)
-    failed_tickers.extend(alpaca_failed)
+    finviz_data, finviz_failed = fetch_finviz_fallback(missing_tickers)
+    price_data.update(finviz_data)
+    failed_tickers.extend(finviz_failed)
 
   return price_data, failed_tickers
 
@@ -841,7 +762,11 @@ def fetch_ibb_data():
       cmf_5 = float(mf_volume.tail(5).sum() / vol.tail(5).sum())
 
       price_5d_change = float(
-          ((hist["Close"].iloc[-1] - hist["Close"].iloc[-5]) / hist["Close"].iloc[-5]) * 100
+          (
+              (hist["Close"].iloc[-1] - hist["Close"].iloc[-5])
+              / hist["Close"].iloc[-5]
+          )
+          * 100
       )
 
       if price_5d_change < 0 and cmf_5 >= 0:
@@ -889,13 +814,12 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_combined_rss():
-  """Fetches entries from both StockTitan Clinical Trials and FDA Approval RSS feeds, extracts tickers, and combines them."""
   rss_urls = [
       ("https://www.stocktitan.net/rss-clinical-trials", "CLINICAL TRIAL"),
-      ("https://www.stocktitan.net/rss-fda-approvals", "FDA APPROVAL")
+      ("https://www.stocktitan.net/rss-fda-approvals", "FDA APPROVAL"),
   ]
   entries_list = []
-  
+
   for rss_url, feed_tag in rss_urls:
     try:
       feed = feedparser.parse(rss_url)
@@ -904,13 +828,12 @@ def fetch_stocktitan_combined_rss():
         link = entry.get("link", "#")
         published = entry.get("published", "")
         published_parsed = entry.get("published_parsed", None)
-        
-        # Convert published_parsed to timestamp for proper sorting if available
+
         timestamp = time.mktime(published_parsed) if published_parsed else 0
-        
+
         ticker = "MARKET"
         desc_part = title
-        
+
         if "|" in title:
           parts = title.rsplit("|", 1)
           desc_part = parts[0].strip()
@@ -933,21 +856,18 @@ def fetch_stocktitan_combined_rss():
             "link": link,
             "published": published,
             "timestamp": timestamp,
-            "feed_tag": feed_tag
+            "feed_tag": feed_tag,
         })
     except Exception:
       pass
 
-  # Sort combined entries by timestamp descending (newest first)
   entries_list = sorted(entries_list, key=lambda x: x["timestamp"], reverse=True)
   return entries_list
 
 
 if st.session_state.get("is_running", False):
   with st.spinner("Fetching live market data..."):
-    price_data, failed_tickers = fetch_screener_data(
-        tickers, alpaca_api_key, alpaca_secret_key
-    )
+    price_data, failed_tickers = fetch_screener_data(tickers)
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
     clinical_rss_entries = fetch_stocktitan_combined_rss()
@@ -955,7 +875,7 @@ if st.session_state.get("is_running", False):
   results = []
   for ticker in tickers:
     overview_url = f"https://www.stocktitan.net/overview/{ticker}/"
-    
+
     if ticker not in price_data:
       results.append({
           "Ticker": ticker,
@@ -995,9 +915,7 @@ if st.session_state.get("is_running", False):
     else:
       avg_volume = 0
 
-    rvol = (
-        (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
-    )
+    rvol = (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
 
     if previous_close == 0:
       results.append({
@@ -1045,17 +963,12 @@ if st.session_state.get("is_running", False):
   clinical_rss_entries = st.session_state.get("clinical_rss_entries", [])
 
   # Metrics summary
-
   valid = df[df["Status"] == "OK"]
 
   col1, col2, col3 = st.columns(3)
-
   col1.metric("Total Scanned", len(tickers))
-
   col2.metric("Valid Data", len(valid))
-
   col3.metric("Errors / Missing", len(failed_tickers))
-
 
   if not valid.empty:
     top = valid.iloc[0]
@@ -1066,9 +979,7 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-
-  # Display interactive dataframe (with index hidden)
-
+  # Display interactive dataframe
   st.subheader("📋 Stock Performance Table")
 
   st.dataframe(
@@ -1094,11 +1005,8 @@ if st.session_state.get("is_running", False):
       hide_index=True,
   )
 
-
   # CSV Download Button
-
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-
   csv = df.to_csv(index=False).encode("utf-8")
 
   st.download_button(
@@ -1108,22 +1016,19 @@ if st.session_state.get("is_running", False):
       mime="text/csv",
   )
 
-
   st.markdown("---")
 
-  # ---------------------------------------------------------------------------
   # NATIVE SCROLLABLE CONTAINER FOR COMBINED STOCKTITAN RSS FEEDS
-  # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trials & FDA Approvals RSS Feed")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Combined live feed tracking real-time clinical trial announcements and FDA approval updates."
+      "Combined live feed tracking real-time clinical trial announcements and"
+      " FDA approval updates."
       "</p>",
-      unsafe_allow_html=True
+      unsafe_allow_html=True,
   )
-  
-  # Check for new items compared to previously stored session entries and trigger the jingle bells sound alert once
-  current_entry_links = {entry['link'] for entry in clinical_rss_entries}
+
+  current_entry_links = {entry["link"] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
     has_new_rss_cards = False
@@ -1141,7 +1046,6 @@ if st.session_state.get("is_running", False):
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
-  # Map advancing stock tickers with daily change > 5% to their change percentage
   advancing_tickers_pct = df[
       (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
   ].set_index("Ticker")["Daily Change (%)"].to_dict()
@@ -1149,30 +1053,36 @@ if st.session_state.get("is_running", False):
   with st.container(height=400):
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
-        ticker = entry['ticker']
-        description = entry['description']
-        link = entry['link']
-        published = entry['published']
-        feed_tag = entry['feed_tag']
-        
-        # Determine background color gradient: the higher above 5%, the deeper green the card
+        ticker = entry["ticker"]
+        description = entry["description"]
+        link = entry["link"]
+        published = entry["published"]
+        feed_tag = entry["feed_tag"]
+
         if ticker in advancing_tickers_pct:
           change_pct = advancing_tickers_pct[ticker]
           if change_pct >= 20.0:
-            card_bg = "#6ee7b7"  # Deep vivid green (20%+)
+            card_bg = "#6ee7b7"
           elif change_pct >= 15.0:
-            card_bg = "#86efac"  # Medium-dark green (15% - 20%)
+            card_bg = "#86efac"
           elif change_pct >= 10.0:
-            card_bg = "#a7f3d0"  # Medium green (10% - 15%)
+            card_bg = "#a7f3d0"
           else:
-            card_bg = "#d1fae5"  # Soft light green (5% - 10%)
+            card_bg = "#d1fae5"
         else:
-          card_bg = "#ffffff"     # Default white body background
-        
-        border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"    # Green accent for FDA, Blue for Clinical
-        
-        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
-        
+          card_bg = "#ffffff"
+
+        border_color = (
+            "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"
+        )
+        pub_badge = (
+            f"<span style='background-color: #f1f3f5; color: #495057; padding:"
+            f" 2px 6px; border-radius: 4px; font-size: 9px; float:"
+            f" right;'>🕒 {published}</span>"
+            if published
+            else ""
+        )
+
         card_html = f"""
         <div style="
             background-color: {card_bg}; 
@@ -1195,26 +1105,20 @@ if st.session_state.get("is_running", False):
         st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feeds.</p>",
-          unsafe_allow_html=True
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or"
+          " unable to fetch the RSS feeds.</p>",
+          unsafe_allow_html=True,
       )
 
   st.markdown("---")
 
-  # ---------------------------------------------------------------------------
-
   # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
-
-  # ---------------------------------------------------------------------------
-
   tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators",
       "📊 Sentiment Dashboard Visuals",
   ])
 
-
-  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
-
+  # SLIDE 1: MACRO INFOS SECTION
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1223,16 +1127,10 @@ if st.session_state.get("is_running", False):
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
 
-      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
-
       ind_col1, ind_col2 = st.columns(2)
-
       cmf_val = ibb_info["cmf"]
       divergence_info = ibb_info["divergence_info"]
-
-      cmf_status = (
-          "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
-      )
+      cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
       cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
 
       with ind_col1:
@@ -1258,13 +1156,10 @@ if st.session_state.get("is_running", False):
             delta_color=div_delta_color,
         )
 
-      # VXN Info Display under Divergence
-
       if vxn_info.get("status") == "OK":
         vxn_val = vxn_info["price"]
         vxn_change = vxn_info["change"]
         vxn_pct = vxn_info["pct_change"]
-
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
 
         st.metric(
@@ -1279,32 +1174,18 @@ if st.session_state.get("is_running", False):
             " Finance."
         )
 
-      # Rewritten Strategy Logic explanatory text
-
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
           " margin-bottom:15px;'>💡 <b>Strategy Logic:</b> Dynamic"
           " multi-factor regime filter leveraging IBB sector momentum,"
           " institutional liquidity via CMF flow, and ^VXN volatility"
-          " boundaries. <b>Long Bias:</b> Activated during positive"
-          " institutional accumulation (CMF > 0 or Bullish Divergence) combined"
-          " with subdued or downward-trending volatility (^VXN), favoring"
-          " aggressive small-to-mid cap biotech momentum plays."
-          " <b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF <"
-          " 0 or Bearish Divergence) paired with expanding ^VXN volatility,"
-          " indicating macro risk-off pressure and favoring defensive capital"
-          " preservation or tactical short exposure. <b>Execution Filter:</b>"
-          " The composite sentiment score and breadth metrics below act as the"
-          " final mandatory gateway to filter out false breakouts before order"
-          " routing.</p>",
+          " boundaries...</p>",
           unsafe_allow_html=True,
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
-
   # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
-
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
@@ -1320,8 +1201,6 @@ if st.session_state.get("is_running", False):
 
         advance_pct = advancers / total * 100
         decline_pct = decliners / total * 100
-        unchanged_pct = unchanged / total * 100
-
         median_return = float(returns.median())
         mean_return = float(returns.mean())
 
@@ -1363,7 +1242,6 @@ if st.session_state.get("is_running", False):
           ax.set_axisbelow(True)
 
         # Panel 1
-
         ax_score.set_title(
             "1. Composite Sentiment Score",
             fontsize=12,
@@ -1428,7 +1306,6 @@ if st.session_state.get("is_running", False):
           spine.set_visible(False)
 
         # Panel 2
-
         ax_breadth.set_title(
             "2. Market Breadth",
             fontsize=12,
@@ -1449,7 +1326,13 @@ if st.session_state.get("is_running", False):
         max_val = max(breadth_values) if breadth_values else 1
         ax_breadth.set_ylim(0, max(1, max_val * 1.30))
         for bar, value, percentage in zip(
-            bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]
+            bars,
+            breadth_values,
+            [
+                advance_pct,
+                decline_pct,
+                (unchanged / total * 100 if total > 0 else 0),
+            ],
         ):
           ax_breadth.annotate(
               f"{value} stocks\n{percentage:.1f}%",
@@ -1467,7 +1350,6 @@ if st.session_state.get("is_running", False):
           ax_breadth.spines[spine].set_visible(False)
 
         # Panel 3
-
         ax_summary.set_title(
             "3. Sector Summary",
             fontsize=12,
@@ -1536,7 +1418,6 @@ if st.session_state.get("is_running", False):
         )
 
         # Panel 4
-
         ax_distribution.set_title(
             "4. Daily Return Distribution",
             fontsize=12,
@@ -1582,9 +1463,6 @@ if st.session_state.get("is_running", False):
 
         st.pyplot(fig)
         plt.close(fig)
-
-
-  # Auto-refresh logic
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
