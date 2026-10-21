@@ -546,12 +546,18 @@ tickers = list(dict.fromkeys(tickers))  # remove duplicates
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 
 
-# Touch-friendly toggle switch (3 min refresh)
+# Touch-friendly toggle switches
 
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 3 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 3 minutes",
+)
+
+low_float_filter = st.sidebar.toggle(
+    "🎯 Low Float Filter (< $50M)",
+    value=False,
+    help="Filters the scanned results to only show stocks with a share float under 50M",
 )
 
 
@@ -664,7 +670,7 @@ def fetch_screener_data(ticker_list):
   failed_tickers = []
   missing_tickers = []
 
-  # 1. Try fetching via Finviz first
+  # 1. Try fetching via Finviz first (includes Float data)
   for ticker in ticker_list:
     try:
       stock_info = finviz.get_stock(ticker)
@@ -673,12 +679,29 @@ def fetch_screener_data(ticker_list):
       vol_str = stock_info.get("Volume", "0").replace(",", "")
       volume = float(vol_str) if vol_str.isdigit() else 0
 
+      # Extract float from Finviz if available (e.g., "12.45M" or "850K")
+      float_str = stock_info.get("Shs Outstand", stock_info.get("Shs Float", "0"))
+      # For safety, fallback parsing or use direct Finviz keys if present:
+      # Finviz usually keys float as "Shs Float"
+      float_raw = stock_info.get("Shs Float", "0")
+      
+      float_shares = 0.0
+      if float_raw:
+        float_raw = float_raw.upper().strip()
+        if "M" in float_raw:
+          float_shares = float(float_raw.replace("M", "")) * 1_000_000
+        elif "B" in float_raw:
+          float_shares = float(float_raw.replace("B", "")) * 1_000_000_000
+        elif "K" in float_raw:
+          float_shares = float(float_raw.replace("K", "")) * 1_000
+
       if price > 0 and prev_close > 0:
         price_data[ticker] = {
             "Previous Close ($)": prev_close,
             "Latest Close ($)": price,
             "Volume": volume,
             "RVOL": float("nan"),
+            "Float": float_shares,
         }
       else:
         missing_tickers.append(ticker)
@@ -688,7 +711,10 @@ def fetch_screener_data(ticker_list):
   # 2. For any missing tickers from Finviz, query yfinance for price/volume
   if missing_tickers:
     yf_data, yf_failed = fetch_yfinance_fallback(missing_tickers)
-    price_data.update(yf_data)
+    for t, dat in yf_data.items():
+      # yfinance fallback doesn't pull float easily, assign 0 or handle
+      dat["Float"] = 0.0
+      price_data[t] = dat
     failed_tickers.extend(yf_failed)
 
   # 3. Compute RVOL via yfinance history for ALL successfully gathered tickers
@@ -881,6 +907,7 @@ if st.session_state.get("is_running", False):
           "Change ($)": None,
           "Daily Change (%)": None,
           "RVOL": None,
+          "Float": None,
           "Overview": overview_url,
           "Status": "No data / insufficient history",
       })
@@ -890,6 +917,7 @@ if st.session_state.get("is_running", False):
     previous_close = stock_info["Previous Close ($)"]
     latest_close = stock_info["Latest Close ($)"]
     rvol = stock_info.get("RVOL", float("nan"))
+    stock_float = stock_info.get("Float", 0.0)
 
     if previous_close == 0:
       results.append({
@@ -899,6 +927,7 @@ if st.session_state.get("is_running", False):
           "Change ($)": None,
           "Daily Change (%)": None,
           "RVOL": rvol,
+          "Float": stock_float,
           "Overview": overview_url,
           "Status": "Invalid previous close",
       })
@@ -914,11 +943,18 @@ if st.session_state.get("is_running", False):
         "Change ($)": change,
         "Daily Change (%)": pct_change,
         "RVOL": rvol,
+        "Float": stock_float,
         "Overview": overview_url,
         "Status": "OK",
     })
 
   df = pd.DataFrame(results)
+
+  # Apply Low Float Filter if toggled on
+  if low_float_filter:
+    # Filter for valid status and float > 0 up to 50M shares
+    df = df[(df["Status"] != "OK") | ((df["Float"] > 0) & (df["Float"] <= 50_000_000))]
+
   df = df.sort_values(
       by="Daily Change (%)", ascending=False, na_position="last"
   ).reset_index(drop=True)
@@ -971,6 +1007,7 @@ if st.session_state.get("is_running", False):
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
               "RVOL": "{:.2f}x",
+              "Float": lambda x: f"{x/1e6:.2f}M" if pd.notnull(x) and x > 0 else "N/A",
           },
           na_rep="N/A",
       ),
