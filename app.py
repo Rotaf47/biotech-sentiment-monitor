@@ -9,18 +9,22 @@ import streamlit as st
 import yfinance as yf
 
 # Page Configuration
+
 st.set_page_config(
     page_title="Biotech Sentiment Monitor", page_icon="📈", layout="wide"
 )
 
+
 st.title("🧬 BSM")
 
 st.markdown(
-    "Scans live biotech tickers via Finviz, ranks daily performance, and"
+    "Scans live biotech tickers via Yahoo Finance, ranks daily performance, and"
     " visualizes market sentiment."
 )
 
+
 # Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
+
 DEFAULT_TICKERS = [
     "AAPG",
     "AARD",
@@ -617,7 +621,9 @@ DEFAULT_TICKERS = [
     "ZYME",
 ]
 
+
 # Sidebar controls
+
 st.sidebar.header("Screener Settings")
 
 tickers_input = st.sidebar.text_area(
@@ -626,11 +632,18 @@ tickers_input = st.sidebar.text_area(
     height=250,
 )
 
+
 # Parse tickers
+
 tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
+
 tickers = list(dict.fromkeys(tickers))  # remove duplicates
 
+
 run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
+
+
+# Touch-friendly toggle switch (3 min refresh)
 
 auto_refresh = st.sidebar.toggle(
     "🔄 Enable 3 min Auto-Refresh",
@@ -638,10 +651,14 @@ auto_refresh = st.sidebar.toggle(
     help="Automatically re-runs the screener every 3 minutes",
 )
 
+
+# Refresh Data button
+
 refresh_btn = st.sidebar.button(
     "🔄 Refresh Data Now",
     help="Clears cache and fetches fresh live data immediately",
 )
+
 
 if refresh_btn:
   st.cache_data.clear()
@@ -649,15 +666,100 @@ if refresh_btn:
     del st.session_state["df_results"]
   st.rerun()
 
+
+# Maintain execution state
+
 if run_scan:
   st.session_state["is_running"] = True
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_finviz_screener_data(ticker_list):
-  """Fetches ticker quotes exclusively via Finviz scraping."""
+def fetch_yfinance_fallback(missing_tickers):
+  """Completes missing tickers data via yfinance download."""
+  yf_data = {}
+  failed_list = []
+
+  if not missing_tickers:
+    return yf_data, missing_tickers
+
+  batch_size = 50
+  for i in range(0, len(missing_tickers), batch_size):
+    batch = missing_tickers[i : i + batch_size]
+    try:
+      data = yf.download(
+          batch,
+          period="3mo",
+          interval="1d",
+          auto_adjust=False,
+          group_by="ticker",
+          threads=True,
+          progress=False,
+      )
+
+      for ticker in batch:
+        try:
+          if len(batch) == 1:
+            hist = data
+          else:
+            if ticker in data.columns.levels[0]:
+              hist = data[ticker]
+            else:
+              failed_list.append((ticker, "No yfinance data found"))
+              continue
+
+          if (
+              hist.empty
+              or "Close" not in hist.columns
+              or "Volume" not in hist.columns
+          ):
+            failed_list.append((ticker, "Incomplete yfinance columns"))
+            continue
+
+          clean_hist = hist[["Close", "Volume"]].dropna(subset=["Close"])
+          if len(clean_hist) < 2:
+            failed_list.append((ticker, "Insufficient yfinance history"))
+            continue
+
+          prices = clean_hist["Close"].dropna()
+          volumes = clean_hist["Volume"].fillna(0)
+
+          prev_close = float(prices.iloc[-2])
+          latest_close = float(prices.iloc[-1])
+          latest_volume = float(volumes.iloc[-1])
+
+          if len(volumes) > 1:
+            avg_volume = float(volumes.iloc[:-1].tail(63).mean())
+          else:
+            avg_volume = 0
+
+          rvol = (
+              (latest_volume / avg_volume) if avg_volume > 0 else float("nan")
+          )
+
+          yf_data[ticker] = {
+              "Previous Close ($)": prev_close,
+              "Latest Close ($)": latest_close,
+              "Volume": latest_volume,
+              "RVOL": rvol,
+          }
+        except Exception as e:
+          failed_list.append(
+              (ticker, f"yfinance parse error: {type(e).__name__}")
+          )
+    except Exception as e:
+      for ticker in batch:
+        failed_list.append(
+            (ticker, f"yfinance batch error: {type(e).__name__}")
+        )
+
+  return yf_data, failed_list
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_screener_data(ticker_list):
   price_data = {}
   failed_tickers = []
+  missing_tickers = []
 
   for ticker in ticker_list:
     try:
@@ -672,11 +774,17 @@ def fetch_finviz_screener_data(ticker_list):
             "Previous Close ($)": prev_close,
             "Latest Close ($)": price,
             "Volume": volume,
+            "RVOL": float("nan"),
         }
       else:
-        failed_tickers.append((ticker, "Incomplete Finviz data"))
-    except Exception as e:
-      failed_tickers.append((ticker, f"Finviz error: {type(e).__name__}"))
+        missing_tickers.append(ticker)
+    except Exception:
+      missing_tickers.append(ticker)
+
+  if missing_tickers:
+    yf_data, yf_failed = fetch_yfinance_fallback(missing_tickers)
+    price_data.update(yf_data)
+    failed_tickers.extend(yf_failed)
 
   return price_data, failed_tickers
 
@@ -757,6 +865,7 @@ def fetch_vxn_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_stocktitan_combined_rss():
+  """Fetches entries from both StockTitan Clinical Trials and FDA Approval RSS feeds, extracts tickers, and combines them."""
   rss_urls = [
       ("https://www.stocktitan.net/rss-clinical-trials", "CLINICAL TRIAL"),
       ("https://www.stocktitan.net/rss-fda-approvals", "FDA APPROVAL"),
@@ -772,6 +881,7 @@ def fetch_stocktitan_combined_rss():
         published = entry.get("published", "")
         published_parsed = entry.get("published_parsed", None)
 
+        # Convert published_parsed to timestamp for proper sorting if available
         timestamp = time.mktime(published_parsed) if published_parsed else 0
 
         ticker = "MARKET"
@@ -804,13 +914,14 @@ def fetch_stocktitan_combined_rss():
     except Exception:
       pass
 
+  # Sort combined entries by timestamp descending (newest first)
   entries_list = sorted(entries_list, key=lambda x: x["timestamp"], reverse=True)
   return entries_list
 
 
 if st.session_state.get("is_running", False):
-  with st.spinner("Fetching live market data via Finviz..."):
-    price_data, failed_tickers = fetch_finviz_screener_data(tickers)
+  with st.spinner("Fetching live market data..."):
+    price_data, failed_tickers = fetch_screener_data(tickers)
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
     clinical_rss_entries = fetch_stocktitan_combined_rss()
@@ -835,6 +946,7 @@ if st.session_state.get("is_running", False):
     stock_info = price_data[ticker]
     previous_close = stock_info["Previous Close ($)"]
     latest_close = stock_info["Latest Close ($)"]
+    rvol = stock_info.get("RVOL", float("nan"))
 
     if previous_close == 0:
       results.append({
@@ -843,7 +955,7 @@ if st.session_state.get("is_running", False):
           "Latest Close ($)": latest_close,
           "Change ($)": None,
           "Daily Change (%)": None,
-          "RVOL": None,
+          "RVOL": rvol,
           "Overview": overview_url,
           "Status": "Invalid previous close",
       })
@@ -858,7 +970,7 @@ if st.session_state.get("is_running", False):
         "Latest Close ($)": latest_close,
         "Change ($)": change,
         "Daily Change (%)": pct_change,
-        "RVOL": None,  # Finviz basic page doesn't track historical intraday rolling average volume arrays natively
+        "RVOL": rvol,
         "Overview": overview_url,
         "Status": "OK",
     })
@@ -882,12 +994,17 @@ if st.session_state.get("is_running", False):
   clinical_rss_entries = st.session_state.get("clinical_rss_entries", [])
 
   # Metrics summary
+
   valid = df[df["Status"] == "OK"]
 
   col1, col2, col3 = st.columns(3)
+
   col1.metric("Total Scanned", len(tickers))
+
   col2.metric("Valid Data", len(valid))
+
   col3.metric("Errors / Missing", len(failed_tickers))
+
 
   if not valid.empty:
     top = valid.iloc[0]
@@ -898,7 +1015,9 @@ if st.session_state.get("is_running", False):
         f" ({bottom['Daily Change (%)']:+.2f}%)"
     )
 
-  # Display interactive dataframe
+
+  # Display interactive dataframe (with index hidden)
+
   st.subheader("📋 Stock Performance Table")
 
   st.dataframe(
@@ -908,7 +1027,7 @@ if st.session_state.get("is_running", False):
               "Latest Close ($)": "{:.4f}",
               "Change ($)": "{:+.4f}",
               "Daily Change (%)": "{:+.2f}%",
-              "RVOL": "{}",
+              "RVOL": "{:.2f}x",
           },
           na_rep="N/A",
       ),
@@ -924,8 +1043,11 @@ if st.session_state.get("is_running", False):
       hide_index=True,
   )
 
+
   # CSV Download Button
+
   timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
   csv = df.to_csv(index=False).encode("utf-8")
 
   st.download_button(
@@ -935,19 +1057,22 @@ if st.session_state.get("is_running", False):
       mime="text/csv",
   )
 
+
   st.markdown("---")
 
+  # ---------------------------------------------------------------------------
   # NATIVE SCROLLABLE CONTAINER FOR COMBINED STOCKTITAN RSS FEEDS
+  # ---------------------------------------------------------------------------
   st.markdown("### 🔬 StockTitan Clinical Trials & FDA Approvals RSS Feed")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Combined live feed tracking real-time clinical trial announcements and"
-      " FDA approval updates."
+      "Combined live feed tracking real-time clinical trial announcements and FDA approval updates."
       "</p>",
-      unsafe_allow_html=True,
+      unsafe_allow_html=True
   )
-
-  current_entry_links = {entry["link"] for entry in clinical_rss_entries}
+  
+  # Check for new items compared to previously stored session entries and trigger the jingle bells sound alert once
+  current_entry_links = {entry['link'] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
     has_new_rss_cards = False
@@ -965,6 +1090,7 @@ if st.session_state.get("is_running", False):
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
+  # Map advancing stock tickers with daily change > 5% to their change percentage
   advancing_tickers_pct = df[
       (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
   ].set_index("Ticker")["Daily Change (%)"].to_dict()
@@ -972,36 +1098,30 @@ if st.session_state.get("is_running", False):
   with st.container(height=400):
     if clinical_rss_entries:
       for entry in clinical_rss_entries:
-        ticker = entry["ticker"]
-        description = entry["description"]
-        link = entry["link"]
-        published = entry["published"]
-        feed_tag = entry["feed_tag"]
-
+        ticker = entry['ticker']
+        description = entry['description']
+        link = entry['link']
+        published = entry['published']
+        feed_tag = entry['feed_tag']
+        
+        # Determine background color gradient: the higher above 5%, the deeper green the card
         if ticker in advancing_tickers_pct:
           change_pct = advancing_tickers_pct[ticker]
           if change_pct >= 20.0:
-            card_bg = "#6ee7b7"
+            card_bg = "#6ee7b7"  # Deep vivid green (20%+)
           elif change_pct >= 15.0:
-            card_bg = "#86efac"
+            card_bg = "#86efac"  # Medium-dark green (15% - 20%)
           elif change_pct >= 10.0:
-            card_bg = "#a7f3d0"
+            card_bg = "#a7f3d0"  # Medium green (10% - 15%)
           else:
-            card_bg = "#d1fae5"
+            card_bg = "#d1fae5"  # Soft light green (5% - 10%)
         else:
-          card_bg = "#ffffff"
-
-        border_color = (
-            "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"
-        )
-        pub_badge = (
-            f"<span style='background-color: #f1f3f5; color: #495057; padding:"
-            f" 2px 6px; border-radius: 4px; font-size: 9px; float:"
-            f" right;'>🕒 {published}</span>"
-            if published
-            else ""
-        )
-
+          card_bg = "#ffffff"     # Default white body background
+        
+        border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"    # Green accent for FDA, Blue for Clinical
+        
+        pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
+        
         card_html = f"""
         <div style="
             background-color: {card_bg}; 
@@ -1024,20 +1144,26 @@ if st.session_state.get("is_running", False):
         st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No entries found or"
-          " unable to fetch the RSS feeds.</p>",
-          unsafe_allow_html=True,
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feeds.</p>",
+          unsafe_allow_html=True
       )
 
   st.markdown("---")
 
+  # ---------------------------------------------------------------------------
+
   # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
+
+  # ---------------------------------------------------------------------------
+
   tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators",
       "📊 Sentiment Dashboard Visuals",
   ])
 
-  # SLIDE 1: MACRO INFOS SECTION
+
+  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
+
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
       st.metric(
@@ -1046,10 +1172,16 @@ if st.session_state.get("is_running", False):
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
 
+      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
+
       ind_col1, ind_col2 = st.columns(2)
+
       cmf_val = ibb_info["cmf"]
       divergence_info = ibb_info["divergence_info"]
-      cmf_status = "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+
+      cmf_status = (
+          "Buying Pressure" if cmf_val >= 0 else "Selling Pressure"
+      )
       cmf_delta_color = "normal" if cmf_val >= 0 else "inverse"
 
       with ind_col1:
@@ -1075,10 +1207,13 @@ if st.session_state.get("is_running", False):
             delta_color=div_delta_color,
         )
 
+      # VXN Info Display under Divergence
+
       if vxn_info.get("status") == "OK":
         vxn_val = vxn_info["price"]
         vxn_change = vxn_info["change"]
         vxn_pct = vxn_info["pct_change"]
+
         vxn_delta_color = "inverse" if vxn_change > 0 else "normal"
 
         st.metric(
@@ -1093,18 +1228,32 @@ if st.session_state.get("is_running", False):
             " Finance."
         )
 
+      # Rewritten Strategy Logic explanatory text
+
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
           " margin-bottom:15px;'>💡 <b>Strategy Logic:</b> Dynamic"
           " multi-factor regime filter leveraging IBB sector momentum,"
           " institutional liquidity via CMF flow, and ^VXN volatility"
-          " boundaries...</p>",
+          " boundaries. <b>Long Bias:</b> Activated during positive"
+          " institutional accumulation (CMF > 0 or Bullish Divergence) combined"
+          " with subdued or downward-trending volatility (^VXN), favoring"
+          " aggressive small-to-mid cap biotech momentum plays."
+          " <b>Short/Hedge Bias:</b> Triggered under heavy distribution (CMF <"
+          " 0 or Bearish Divergence) paired with expanding ^VXN volatility,"
+          " indicating macro risk-off pressure and favoring defensive capital"
+          " preservation or tactical short exposure. <b>Execution Filter:</b>"
+          " The composite sentiment score and breadth metrics below act as the"
+          " final mandatory gateway to filter out false breakouts before order"
+          " routing.</p>",
           unsafe_allow_html=True,
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
 
+
   # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
+
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
     if not clean_df.empty and "Daily Change (%)" in clean_df.columns:
@@ -1120,6 +1269,8 @@ if st.session_state.get("is_running", False):
 
         advance_pct = advancers / total * 100
         decline_pct = decliners / total * 100
+        unchanged_pct = unchanged / total * 100
+
         median_return = float(returns.median())
         mean_return = float(returns.mean())
 
@@ -1161,6 +1312,7 @@ if st.session_state.get("is_running", False):
           ax.set_axisbelow(True)
 
         # Panel 1
+
         ax_score.set_title(
             "1. Composite Sentiment Score",
             fontsize=12,
@@ -1225,6 +1377,7 @@ if st.session_state.get("is_running", False):
           spine.set_visible(False)
 
         # Panel 2
+
         ax_breadth.set_title(
             "2. Market Breadth",
             fontsize=12,
@@ -1245,13 +1398,7 @@ if st.session_state.get("is_running", False):
         max_val = max(breadth_values) if breadth_values else 1
         ax_breadth.set_ylim(0, max(1, max_val * 1.30))
         for bar, value, percentage in zip(
-            bars,
-            breadth_values,
-            [
-                advance_pct,
-                decline_pct,
-                (unchanged / total * 100 if total > 0 else 0),
-            ],
+            bars, breadth_values, [advance_pct, decline_pct, unchanged_pct]
         ):
           ax_breadth.annotate(
               f"{value} stocks\n{percentage:.1f}%",
@@ -1269,6 +1416,7 @@ if st.session_state.get("is_running", False):
           ax_breadth.spines[spine].set_visible(False)
 
         # Panel 3
+
         ax_summary.set_title(
             "3. Sector Summary",
             fontsize=12,
@@ -1337,6 +1485,7 @@ if st.session_state.get("is_running", False):
         )
 
         # Panel 4
+
         ax_distribution.set_title(
             "4. Daily Return Distribution",
             fontsize=12,
@@ -1382,6 +1531,9 @@ if st.session_state.get("is_running", False):
 
         st.pyplot(fig)
         plt.close(fig)
+
+
+  # Auto-refresh logic
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
