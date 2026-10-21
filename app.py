@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 
+
 # Page Configuration
 
 st.set_page_config(
@@ -761,6 +762,7 @@ def fetch_screener_data(ticker_list):
   failed_tickers = []
   missing_tickers = []
 
+  # 1. Try fetching via Finviz first
   for ticker in ticker_list:
     try:
       stock_info = finviz.get_stock(ticker)
@@ -781,10 +783,51 @@ def fetch_screener_data(ticker_list):
     except Exception:
       missing_tickers.append(ticker)
 
+  # 2. For any missing tickers from Finviz, query yfinance for price/volume
   if missing_tickers:
     yf_data, yf_failed = fetch_yfinance_fallback(missing_tickers)
     price_data.update(yf_data)
     failed_tickers.extend(yf_failed)
+
+  # 3. Compute RVOL via yfinance history for ALL successfully gathered tickers
+  all_valid_tickers = list(price_data.keys())
+  if all_valid_tickers:
+    batch_size = 50
+    for i in range(0, len(all_valid_tickers), batch_size):
+      batch = all_valid_tickers[i : i + batch_size]
+      try:
+        hist_data = yf.download(
+            batch,
+            period="3mo",
+            interval="1d",
+            auto_adjust=False,
+            group_by="ticker",
+            threads=True,
+            progress=False,
+        )
+        for ticker in batch:
+          try:
+            if len(batch) == 1:
+              hist = hist_data
+            else:
+              if ticker in hist_data.columns.levels[0]:
+                hist = hist_data[ticker]
+              else:
+                continue
+
+            if hist.empty or "Volume" not in hist.columns:
+              continue
+
+            volumes = hist["Volume"].fillna(0)
+            if len(volumes) > 1:
+              latest_vol = float(volumes.iloc[-1])
+              avg_vol = float(volumes.iloc[:-1].tail(63).mean())
+              if avg_vol > 0:
+                price_data[ticker]["RVOL"] = latest_vol / avg_vol
+          except Exception:
+            pass
+      except Exception:
+        pass
 
   return price_data, failed_tickers
 
