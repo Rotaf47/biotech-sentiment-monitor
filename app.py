@@ -888,44 +888,58 @@ def fetch_vxn_data():
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_stocktitan_clinical_rss():
-  """Fetches all items from the StockTitan clinical trials RSS feed and extracts tickers correctly from the end (e.g. '... | AVXL Stock News')."""
-  rss_url = "https://www.stocktitan.net/rss-clinical-trials"
+def fetch_stocktitan_combined_rss():
+  """Fetches entries from both StockTitan Clinical Trials and FDA Approval RSS feeds, extracts tickers, and combines them."""
+  rss_urls = [
+      ("https://www.stocktitan.net/rss-clinical-trials", "CLINICAL TRIAL"),
+      ("https://www.stocktitan.net/rss-fda-approvals", "FDA APPROVAL")
+  ]
   entries_list = []
-  try:
-    feed = feedparser.parse(rss_url)
-    for entry in feed.entries:
-      title = entry.get("title", "No Title")
-      link = entry.get("link", "#")
-      published = entry.get("published", "")
-      
-      ticker = "MARKET"
-      desc_part = title
-      
-      if "|" in title:
-        parts = title.rsplit("|", 1)
-        desc_part = parts[0].strip()
-        right_part = parts[1].strip()
-        tokens = right_part.split()
-        if tokens:
-          potential_ticker = tokens[0].strip().upper()
+  
+  for rss_url, feed_tag in rss_urls:
+    try:
+      feed = feedparser.parse(rss_url)
+      for entry in feed.entries:
+        title = entry.get("title", "No Title")
+        link = entry.get("link", "#")
+        published = entry.get("published", "")
+        published_parsed = entry.get("published_parsed", None)
+        
+        # Convert published_parsed to timestamp for proper sorting if available
+        timestamp = time.mktime(published_parsed) if published_parsed else 0
+        
+        ticker = "MARKET"
+        desc_part = title
+        
+        if "|" in title:
+          parts = title.rsplit("|", 1)
+          desc_part = parts[0].strip()
+          right_part = parts[1].strip()
+          tokens = right_part.split()
+          if tokens:
+            potential_ticker = tokens[0].strip().upper()
+            if 1 <= len(potential_ticker) <= 6 and potential_ticker.isalnum():
+              ticker = potential_ticker
+        elif ":" in title:
+          parts = title.split(":", 1)
+          potential_ticker = parts[0].strip().upper()
           if 1 <= len(potential_ticker) <= 6 and potential_ticker.isalnum():
             ticker = potential_ticker
-      elif ":" in title:
-        parts = title.split(":", 1)
-        potential_ticker = parts[0].strip().upper()
-        if 1 <= len(potential_ticker) <= 6 and potential_ticker.isalnum():
-          ticker = potential_ticker
-          desc_part = parts[1].strip()
+            desc_part = parts[1].strip()
 
-      entries_list.append({
-          "ticker": ticker,
-          "description": desc_part,
-          "link": link,
-          "published": published
-      })
-  except Exception:
-    pass
+        entries_list.append({
+            "ticker": ticker,
+            "description": desc_part,
+            "link": link,
+            "published": published,
+            "timestamp": timestamp,
+            "feed_tag": feed_tag
+        })
+    except Exception:
+      pass
+
+  # Sort combined entries by timestamp descending (newest first)
+  entries_list = sorted(entries_list, key=lambda x: x["timestamp"], reverse=True)
   return entries_list
 
 
@@ -936,7 +950,7 @@ if st.session_state.get("is_running", False):
     )
     ibb_info = fetch_ibb_data()
     vxn_info = fetch_vxn_data()
-    clinical_rss_entries = fetch_stocktitan_clinical_rss()
+    clinical_rss_entries = fetch_stocktitan_combined_rss()
 
   results = []
   for ticker in tickers:
@@ -1098,12 +1112,12 @@ if st.session_state.get("is_running", False):
   st.markdown("---")
 
   # ---------------------------------------------------------------------------
-  # NATIVE SCROLLABLE CONTAINER FOR STOCKTITAN CLINICAL RSS FEED (PLACED BETWEEN TABLE & SWIPE TOOL)
+  # NATIVE SCROLLABLE CONTAINER FOR COMBINED STOCKTITAN RSS FEEDS
   # ---------------------------------------------------------------------------
-  st.markdown("### 🔬 StockTitan Clinical Trial Results RSS Feed")
+  st.markdown("### 🔬 StockTitan Clinical Trials & FDA Approvals RSS Feed")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Live feed tracking real-time clinical trial announcements and updates."
+      "Combined live feed tracking real-time clinical trial announcements and FDA approval updates."
       "</p>",
       unsafe_allow_html=True
   )
@@ -1139,6 +1153,7 @@ if st.session_state.get("is_running", False):
         description = entry['description']
         link = entry['link']
         published = entry['published']
+        feed_tag = entry['feed_tag']
         
         # Determine background color gradient: the higher above 5%, the deeper green the card
         if ticker in advancing_tickers_pct:
@@ -1154,7 +1169,7 @@ if st.session_state.get("is_running", False):
         else:
           card_bg = "#ffffff"     # Default white body background
         
-        border_color = "#3b82f6"    # Original default blue accent border
+        border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"    # Green accent for FDA, Blue for Clinical
         
         pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
@@ -1170,7 +1185,7 @@ if st.session_state.get("is_running", False):
         ">
             <div style="margin-bottom: 6px;">
                 {pub_badge}
-                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] STOCK NEWS</span>
+                <span style="font-size: 11px; font-weight: 700; color: #1e40af; letter-spacing: 0.5px;">[{ticker}] {feed_tag}</span>
             </div>
             <div style="font-size: 12px; font-weight: 500; line-height: 1.4;">
                 <a href="{link}" target="_blank" style="text-decoration: none; color: #1f2937;">{description}</a>
@@ -1180,7 +1195,7 @@ if st.session_state.get("is_running", False):
         st.markdown(card_html, unsafe_allow_html=True)
     else:
       st.markdown(
-          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feed.</p>",
+          "<p style='font-size: 11px; color: #6c757d;'>No entries found or unable to fetch the RSS feeds.</p>",
           unsafe_allow_html=True
       )
 
