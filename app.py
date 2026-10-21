@@ -1492,8 +1492,12 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  # Identify tickers present in the top 400 of the performance table
-  top_400_tickers = set(df.head(400)["Ticker"].str.upper().tolist())
+  # Identify advancing stock tickers using the dashboard breadth logic (Status OK & Daily Change > 0)
+  advancing_tickers = set(
+      df[(df["Status"] == "OK") & (df["Daily Change (%)"] > 0)]["Ticker"]
+      .str.upper()
+      .tolist()
+  )
 
   with st.container(height=400):
     if clinical_rss_entries:
@@ -1503,7 +1507,8 @@ if st.session_state.get("is_running", False):
         link = entry['link']
         published = entry['published']
         
-        if ticker in top_400_tickers:
+        # Highlight in soft green if the entry ticker is an advancing stock
+        if ticker in advancing_tickers:
           card_bg = "#d1fae5"       # Soft light green background body
         else:
           card_bg = "#ffffff"       # Default white body background
