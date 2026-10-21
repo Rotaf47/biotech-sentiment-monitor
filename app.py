@@ -24,36 +24,29 @@ st.markdown(
 )
 
 
-# Expanded Ticker List (593 Tickers from PDF, ordered alphabetically and placed horizontally)
+# Expanded Ticker List (Updated Tickers, ordered alphabetically and placed horizontally)
 
 DEFAULT_TICKERS = [
-    "AAPG",
     "AARD",
-    "ABCL",
     "ABEO",
     "ABOS",
     "ABSI",
     "ABUS",
     "ABVC",
-    "ABVX",
     "ACAD",
     "ACET",
     "ACHV",
-    "ACIU",
     "ACOG",
     "ACRS",
     "ACRV",
     "ACTU",
     "ACXP",
-    "ADAG",
     "ADIL",
     "ADMA",
     "ADRX",
-    "ADXN",
     "AEON",
     "AGEN",
     "AGIO",
-    "AGMB",
     "AIM",
     "AKTS",
     "AKTX",
@@ -64,13 +57,11 @@ DEFAULT_TICKERS = [
     "ALLR",
     "ALMS",
     "ALNY",
-    "ALPS",
     "ALT",
     "ALXO",
     "ALZN",
     "ANAB",
     "ANIX",
-    "ANL",
     "ANNX",
     "ANRO",
     "ANTX",
@@ -81,7 +72,6 @@ DEFAULT_TICKERS = [
     "APVO",
     "ARCT",
     "ARDX",
-    "ARGX",
     "ARMP",
     "ARQT",
     "ARTL",
@@ -89,16 +79,12 @@ DEFAULT_TICKERS = [
     "ARVN",
     "ARWR",
     "ASMB",
-    "ASND",
-    "ATHE",
     "ATNM",
     "ATOS",
     "ATRA",
     "ATTO",
     "ATYR",
-    "AUPH",
     "AURA",
-    "AUTL",
     "AVBP",
     "AVIR",
     "AVLN",
@@ -111,20 +97,15 @@ DEFAULT_TICKERS = [
     "BBOT",
     "BCAX",
     "BCDA",
-    "BCTX",
-    "BCYC",
-    "BDRX",
     "BDTX",
     "BEAM",
     "BHVN",
     "BIVI",
-    "BLRX",
     "BLSM",
     "BLTE",
     "BMEA",
     "BMRN",
     "BNTC",
-    "BNTX",
     "BOLD",
     "BOLT",
     "BRTX",
@@ -136,7 +117,6 @@ DEFAULT_TICKERS = [
     "CAI",
     "CALC",
     "CAMP",
-    "CANF",
     "CAPR",
     "CBIO",
     "CBUS",
@@ -148,20 +128,16 @@ DEFAULT_TICKERS = [
     "CELU",
     "CELZ",
     "CGEM",
-    "CGEN",
     "CGON",
     "CGTX",
     "CHRS",
     "CING",
     "CLDI",
     "CLDX",
-    "CLGN",
-    "CLLS",
     "CLNN",
     "CLRB",
     "CLYM",
     "CMMB",
-    "CMND",
     "CMPX",
     "CNSP",
     "CNSY",
@@ -179,7 +155,6 @@ DEFAULT_TICKERS = [
     "CRDF",
     "CRIS",
     "CRMD",
-    "CRSP",
     "CRVO",
     "CRVS",
     "CSBR",
@@ -188,12 +163,12 @@ DEFAULT_TICKERS = [
     "CTXR",
     "CTY",
     "CUE",
-    "CUVL",
+    "CURX",
     "CVKD",
     "CVM",
+    "CYPH",
     "CYTK",
     "DARE",
-    "DBVT",
     "DCOY",
     "DFTX",
     "DMAC",
@@ -202,7 +177,6 @@ DEFAULT_TICKERS = [
     "DNLI",
     "DNTH",
     "DRMA",
-    "DRTS",
     "DRUG",
     "DSGN",
     "DTIL",
@@ -210,7 +184,6 @@ DEFAULT_TICKERS = [
     "DYAI",
     "DYN",
     "EDIT",
-    "EDSA",
     "EDVA",
     "EIKN",
     "ELAB",
@@ -218,21 +191,14 @@ DEFAULT_TICKERS = [
     "ELOX",
     "ELTX",
     "ELVN",
-    "ENGN",
-    "ENLV",
     "ENSC",
     "ENTA",
-    "ENTX",
     "ENVB",
-    "EOCN",
-    "EPRX",
     "EQ",
     "ERAS",
     "ERNA",
     "ESLA",
     "ETRA",
-    "EVAX",
-    "EVGN",
     "EVMN",
     "EWTX",
     "EXEL",
@@ -250,13 +216,10 @@ DEFAULT_TICKERS = [
     "FULC",
     "GALT",
     "GANX",
-    "GDTC",
     "GENB",
     "GERN",
-    "GHRS",
     "GLSI",
     "GLUE",
-    "GMAB",
     "GNLX",
     "GNPX",
     "GOSS",
@@ -270,7 +233,6 @@ DEFAULT_TICKERS = [
     "GYRE",
     "HALO",
     "HCWB",
-    "HELP",
     "HIND",
     "HOWL",
     "HRMY",
@@ -286,18 +248,13 @@ DEFAULT_TICKERS = [
     "ICCC",
     "ICU",
     "IDYA",
-    "IFRX",
     "IGC",
     "IKT",
     "IMA",
-    "IMCR",
-    "IMMP",
     "IMMX",
     "IMNM",
     "IMNN",
-    "IMRN",
     "IMRX",
-    "IMTX",
     "IMUX",
     "IMVT",
     "INAB",
@@ -312,16 +269,13 @@ DEFAULT_TICKERS = [
     "INVA",
     "IONS",
     "IOVA",
-    "IPHA",
     "IPSC",
     "IRD",
     "IRLA",
     "IRON",
-    "IVA",
     "IVVD",
     "JAGX",
     "JANX",
-    "JAZZ",
     "JBIO",
     "JSPR",
     "JUNS",
@@ -342,18 +296,15 @@ DEFAULT_TICKERS = [
     "KYMR",
     "KYNB",
     "KYTX",
-    "KZIA",
     "LABT",
     "LBRX",
     "LCTX",
     "LEGN",
     "LENZ",
-    "LEXX",
     "LGND",
     "LGVN",
     "LIMN",
     "LITS",
-    "LKFT",
     "LNAI",
     "LONA",
     "LPCN",
@@ -372,39 +323,25 @@ DEFAULT_TICKERS = [
     "MBX",
     "MCRB",
     "MDGL",
-    "MDWD",
     "MDXG",
-    "MENS",
-    "MESO",
     "MGNX",
     "MGTX",
     "MGX",
     "MIRM",
-    "MIST",
-    "MLEC",
-    "MLTX",
     "MLYS",
     "MNKD",
     "MNOV",
     "MNPR",
-    "MOLN",
     "MPLT",
-    "MREO",
     "MRKR",
     "MRNA",
     "MRVI",
-    "MSLE",
     "MTNB",
     "MTVA",
-    "NAMS",
     "NAUT",
     "NBP",
-    "NBTX",
-    "NCEL",
-    "NCNA",
     "NERV",
     "NEUP",
-    "NGEN",
     "NGNE",
     "NIKI",
     "NKTR",
@@ -412,7 +349,6 @@ DEFAULT_TICKERS = [
     "NMRA",
     "NNVC",
     "NRIX",
-    "NRSN",
     "NRXP",
     "NRXS",
     "NTHI",
@@ -426,15 +362,12 @@ DEFAULT_TICKERS = [
     "OBIO",
     "OBX",
     "OCGN",
-    "OCS",
     "OCUL",
     "ODTX",
     "OGEN",
     "OKUR",
-    "OKYO",
     "OLMA",
     "OMER",
-    "ONC",
     "ONCO",
     "ONCY",
     "ORIC",
@@ -446,46 +379,32 @@ DEFAULT_TICKERS = [
     "PALI",
     "PASG",
     "PBLS",
-    "PBM",
     "PBYI",
     "PCSA",
     "PCVX",
     "PDSB",
     "PEPG",
     "PGEN",
-    "PHAR",
     "PHAT",
     "PHIO",
-    "PHVS",
     "PLRX",
-    "PLRZ",
-    "PLUR",
     "PLX",
     "PLYX",
     "PMCB",
-    "PMN",
     "PMVP",
-    "PPBT",
-    "PPCB",
     "PRAX",
     "PRLD",
     "PRME",
     "PROK",
-    "PRQR",
-    "PRTA",
     "PTCT",
     "PTGX",
     "PTHS",
     "PTN",
     "PULM",
     "PVLA",
-    "PYPD",
     "PYXS",
     "QNRX",
-    "QNTM",
     "QTTB",
-    "QURE",
-    "RADX",
     "RANI",
     "RAPP",
     "RARE",
@@ -504,7 +423,6 @@ DEFAULT_TICKERS = [
     "RNAZ",
     "RNTX",
     "RNXT",
-    "ROIV",
     "RPRX",
     "RTSN",
     "RVMD",
@@ -513,7 +431,6 @@ DEFAULT_TICKERS = [
     "RZLT",
     "SABS",
     "SANA",
-    "SCNI",
     "SCTX",
     "SEER",
     "SEPN",
@@ -523,102 +440,87 @@ DEFAULT_TICKERS = [
     "SILO",
     "SION",
     "SKYE",
-    "SLBT",
     "SLDB",
-    "SLGL",
-    "SLN",
-    "SXTP",
-    "TCRT",
-    "SPRY",
-    "TECH",
-    "TRDA",
-    "XCUR",
-    "TRAX",
-    "TIL",
-    "TARA",
-    "SRPT",
-    "SVRA",
-    "SRRK",
-    "SPRC",
-    "SPTX",
     "SLS",
-    "SNTI",
-    "STTK",
-    "SLXN",
-    "SNGX",
-    "SPRO",
-    "SPRB",
-    "SYRE",
-    "STOK",
     "SMMT",
-    "SRZN",
-    "STRO",
     "SNDX",
-    "TNGX",
+    "SNGX",
+    "SNTI",
+    "SPRB",
+    "SPRO",
+    "SPRY",
+    "SPTX",
+    "SRPT",
+    "SRRK",
+    "SRZN",
+    "STOK",
+    "STRO",
+    "STTK",
+    "SVRA",
+    "SXTP",
+    "SYRE",
+    "TARA",
     "TARS",
-    "TSHA",
+    "TCRT",
+    "TCRX",
+    "TECH",
     "TECX",
-    "TLX",
     "TELO",
-    "TPST",
     "TENX",
-    "TNYA",
-    "TVGN",
     "TGTX",
-    "TOVX",
-    "TLSA",
+    "TIL",
+    "TKVA",
+    "TNGX",
     "TNXP",
-    "TVTX",
+    "TNYA",
+    "TOVX",
+    "TPST",
     "TRAW",
+    "TRAX",
+    "TRDA",
     "TRVI",
     "TRXB",
-    "TCRX",
+    "TSHA",
     "TTRX",
+    "TVGN",
     "TVRD",
+    "TVTX",
     "TWST",
     "TYRA",
     "UNCY",
     "UPB",
     "URGN",
-    "VBIO",
-    "VALN",
-    "VNDA",
-    "VERA",
-    "VSTM",
-    "VRXA",
-    "VCEL",
-    "VRCA",
-    "VRTX",
-    "VERU",
-    "VCRE",
-    "VKTX",
-    "VIR",
-    "VRAX",
-    "VRDN",
-    "VTGN",
     "VANI",
+    "VBIO",
+    "VCEL",
+    "VERA",
+    "VERU",
+    "VIR",
     "VIVS",
+    "VKTX",
+    "VNDA",
     "VOGX",
     "VOR",
-    "VYGR",
+    "VRCA",
+    "VRDN",
+    "VRTX",
+    "VSTM",
+    "VTGN",
     "VTVT",
-    "WVE",
+    "VYGR",
     "WHWK",
-    "XFOR",
-    "XBIT",
-    "XNCR",
+    "WVE",
     "XBIO",
-    "XENE",
+    "XBIT",
+    "XCUR",
+    "XFOR",
     "XLO",
-    "XRTX",
-    "XTLB",
+    "XNCR",
     "YARW",
-    "YDES",
-    "ZLAB",
     "ZBIO",
     "ZNTL",
-    "ZVRA",
     "ZURA",
+    "ZVRA",
     "ZYME",
 ]
 
@@ -924,7 +826,6 @@ def fetch_stocktitan_combined_rss():
         published = entry.get("published", "")
         published_parsed = entry.get("published_parsed", None)
 
-        # Convert published_parsed to timestamp for proper sorting if available
         timestamp = time.mktime(published_parsed) if published_parsed else 0
 
         ticker = "MARKET"
@@ -957,7 +858,6 @@ def fetch_stocktitan_combined_rss():
     except Exception:
       pass
 
-  # Sort combined entries by timestamp descending (newest first)
   entries_list = sorted(entries_list, key=lambda x: x["timestamp"], reverse=True)
   return entries_list
 
@@ -1114,7 +1014,6 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True
   )
   
-  # Check for new items compared to previously stored session entries and trigger the jingle bells sound alert once
   current_entry_links = {entry['link'] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
@@ -1133,7 +1032,6 @@ if st.session_state.get("is_running", False):
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
-  # Map advancing stock tickers with daily change > 5% to their change percentage
   advancing_tickers_pct = df[
       (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
   ].set_index("Ticker")["Daily Change (%)"].to_dict()
@@ -1147,21 +1045,20 @@ if st.session_state.get("is_running", False):
         published = entry['published']
         feed_tag = entry['feed_tag']
         
-        # Determine background color gradient: the higher above 5%, the deeper green the card
         if ticker in advancing_tickers_pct:
           change_pct = advancing_tickers_pct[ticker]
           if change_pct >= 20.0:
-            card_bg = "#6ee7b7"  # Deep vivid green (20%+)
+            card_bg = "#6ee7b7"
           elif change_pct >= 15.0:
-            card_bg = "#86efac"  # Medium-dark green (15% - 20%)
+            card_bg = "#86efac"
           elif change_pct >= 10.0:
-            card_bg = "#a7f3d0"  # Medium green (10% - 15%)
+            card_bg = "#a7f3d0"
           else:
-            card_bg = "#d1fae5"  # Soft light green (5% - 10%)
+            card_bg = "#d1fae5"
         else:
-          card_bg = "#ffffff"     # Default white body background
+          card_bg = "#ffffff"
         
-        border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"    # Green accent for FDA, Blue for Clinical
+        border_color = "#10b981" if feed_tag == "FDA APPROVAL" else "#3b82f6"
         
         pub_badge = f"<span style='background-color: #f1f3f5; color: #495057; padding: 2px 6px; border-radius: 4px; font-size: 9px; float: right;'>🕒 {published}</span>" if published else ""
         
@@ -1193,19 +1090,10 @@ if st.session_state.get("is_running", False):
 
   st.markdown("---")
 
-  # ---------------------------------------------------------------------------
-
-  # HORIZONTAL SWIPE TAB CONTAINER (MACRO INFOS VS DASHBOARD IMAGE SIDE-BY-SIDE)
-
-  # ---------------------------------------------------------------------------
-
   tab_macro_info, tab_dashboard = st.tabs([
       "📈 Macro & Sector Indicators",
       "📊 Sentiment Dashboard Visuals",
   ])
-
-
-  # SLIDE 1: MACRO INFOS SECTION AS IT WAS ORIGINALLY
 
   with tab_macro_info:
     if ibb_info.get("status") == "OK":
@@ -1214,8 +1102,6 @@ if st.session_state.get("is_running", False):
           f"${ibb_info['price']:.2f}",
           f"{ibb_info['change']:+.2f} ({ibb_info['pct_change']:+.2f}%)",
       )
-
-      # 5D CMF and Price / CMF Divergence Info Side-by-Side metrics
 
       ind_col1, ind_col2 = st.columns(2)
 
@@ -1250,8 +1136,6 @@ if st.session_state.get("is_running", False):
             delta_color=div_delta_color,
         )
 
-      # VXN Info Display under Divergence
-
       if vxn_info.get("status") == "OK":
         vxn_val = vxn_info["price"]
         vxn_change = vxn_info["change"]
@@ -1270,8 +1154,6 @@ if st.session_state.get("is_running", False):
             "Could not fetch live CBOE NASDAQ Volatility (^VXN) data from Yahoo"
             " Finance."
         )
-
-      # Rewritten Strategy Logic explanatory text
 
       st.markdown(
           "<p style='font-size:11px; color:#6c757d; margin-top:-5px;"
@@ -1293,9 +1175,6 @@ if st.session_state.get("is_running", False):
       )
     else:
       st.warning("Could not fetch live IBB ETF data from Yahoo Finance.")
-
-
-  # SLIDE 2: SECTOR SENTIMENT DASHBOARD IMAGE / VISUALS
 
   with tab_dashboard:
     clean_df = df[df["Status"] == "OK"].copy()
@@ -1353,8 +1232,6 @@ if st.session_state.get("is_running", False):
         for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
           ax.set_facecolor("#ffffff")
           ax.set_axisbelow(True)
-
-        # Panel 1
 
         ax_score.set_title(
             "1. Composite Sentiment Score",
@@ -1419,8 +1296,6 @@ if st.session_state.get("is_running", False):
         for spine in ax_score.spines.values():
           spine.set_visible(False)
 
-        # Panel 2
-
         ax_breadth.set_title(
             "2. Market Breadth",
             fontsize=12,
@@ -1457,8 +1332,6 @@ if st.session_state.get("is_running", False):
         ax_breadth.grid(axis="y", alpha=0.2)
         for spine in ["top", "right"]:
           ax_breadth.spines[spine].set_visible(False)
-
-        # Panel 3
 
         ax_summary.set_title(
             "3. Sector Summary",
@@ -1527,8 +1400,6 @@ if st.session_state.get("is_running", False):
             va="top",
         )
 
-        # Panel 4
-
         ax_distribution.set_title(
             "4. Daily Return Distribution",
             fontsize=12,
@@ -1574,9 +1445,6 @@ if st.session_state.get("is_running", False):
 
         st.pyplot(fig)
         plt.close(fig)
-
-
-  # Auto-refresh logic
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
