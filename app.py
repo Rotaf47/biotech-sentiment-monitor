@@ -1549,7 +1549,7 @@ if st.session_state.get("is_running", False):
 
     st.markdown(
         f"""
-        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 5px; margin-bottom: 8px;">
+        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 5px; margin-bottom: 5px;">
             <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
             <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:45 execution time.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
