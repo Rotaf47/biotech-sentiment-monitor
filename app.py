@@ -1502,13 +1502,13 @@ if st.session_state.get("is_running", False):
         plt.close(fig)
 
   # =========================================================================
-  # IBB ETF SHORT STRATEGY INDICATORS & AUTOMATED MONITOR CARD
+  # IBB ETF SHORT STRATEGY INDICATORS & AUTOMATED MONITOR CARD (MOROCCO TIME)
   # =========================================================================
   st.markdown("---")
-  st.markdown("### 📉 IBB ETF Short Strategy Monitor (XTB CFD)")
+  st.markdown("### 📉 IBB ETF Short Strategy Monitor (XTB CFD - Morocco Time)")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Tracks premarket sentiment, IBB gap conditions, Friday seasonality, and 09:45 AM execution timing."
+      "Tracks premarket sentiment, IBB gap conditions, Friday seasonality, and Morocco market time (13:30 entry trigger)."
       "</p>",
       unsafe_allow_html=True,
   )
@@ -1537,7 +1537,8 @@ if st.session_state.get("is_running", False):
   rule_1_sentiment = current_sentiment_score <= -30
   rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
   rule_3_friday = is_friday_val
-  rule_4_timing = current_time_val >= dtime(9, 45)
+  # Morocco market open + 15 min wait time (9:45 EST corresponds to 13:30 Morocco time)
+  rule_4_timing = current_time_val >= dtime(13, 30)
 
   all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
 
@@ -1545,24 +1546,24 @@ if st.session_state.get("is_running", False):
     strat_col1, strat_col2 = st.columns([1, 1])
 
     with strat_col1:
-      st.markdown("#### 📋 Strategy Checklist")
+      st.markdown("#### 📋 Strategy Checklist (Morocco Time)")
       st.markdown(f"**1. Premarket Sentiment (Bearish/Very Bearish):** {'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})")
       st.markdown(f"**2. IBB Down a Bit (-0.3% to -1.5%):** {'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)")
       st.markdown(f"**3. Day is Friday:** {'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})")
-      st.markdown(f"**4. Time >= 09:45 AM EST:** {'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
+      st.markdown(f"**4. Morocco Time >= 13:30:** {'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
 
     with strat_col2:
       st.markdown("#### ⚡ Execution Status")
       if all_rules_met:
         st.success("🚨 **ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB**")
         st.markdown(
-            "<p style='font-size:12px; color:#087f5b;'>All strategy conditions are met. Ensure 15-minute Opening Range Low (ORL) breakout confirmation before order placement.</p>",
+            "<p style='font-size:12px; color:#087f5b;'>All strategy conditions are met under Morocco time. Ensure 15-minute Opening Range Low (ORL) breakout confirmation before order placement.</p>",
             unsafe_allow_html=True,
         )
       else:
         st.info("⏳ **STATUS: HOLD / NO TRADE**")
         st.markdown(
-            "<p style='font-size:12px; color:#6c757d;'>Waiting for all premarket, day, and timing conditions to align.</p>",
+            "<p style='font-size:12px; color:#6c757d;'>Waiting for all premarket, day, and 13:30 Morocco time conditions to align.</p>",
             unsafe_allow_html=True,
         )
 
