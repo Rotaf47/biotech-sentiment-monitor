@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time as dtime
 import time
 import feedparser
 import finviz
@@ -1501,6 +1501,71 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
+  # =========================================================================
+  # IBB ETF SHORT STRATEGY INDICATORS & AUTOMATED MONITOR CARD
+  # =========================================================================
+  st.markdown("---")
+  st.markdown("### 📉 IBB ETF Short Strategy Monitor (XTB CFD)")
+  st.markdown(
+      "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
+      "Tracks premarket sentiment, IBB gap conditions, Friday seasonality, and 09:45 AM execution timing."
+      "</p>",
+      unsafe_allow_html=True,
+  )
+
+  current_sentiment_score = 0.0
+  if "df_results" in st.session_state:
+    clean_df_strat = st.session_state["df_results"]
+    clean_df_strat = clean_df_strat[clean_df_strat["Status"] == "OK"]
+    if not clean_df_strat.empty and "Daily Change (%)" in clean_df_strat.columns:
+      ret_strat = pd.to_numeric(clean_df_strat["Daily Change (%)"], errors="coerce").dropna()
+      if not ret_strat.empty:
+        adv_pct = (ret_strat > 0).sum() / len(ret_strat) * 100
+        dec_pct = (ret_strat < 0).sum() / len(ret_strat) * 100
+        breadth_sc = adv_pct - dec_pct
+        mean_ret = float(ret_strat.mean())
+        ret_sc = float(np.clip(mean_ret / 2.0 * 100, -100, 100))
+        current_sentiment_score = float(np.clip(0.70 * breadth_sc + 0.30 * ret_sc, -100, 100))
+
+  ibb_data_strat = st.session_state.get("ibb_info", {})
+  ibb_pct_change = ibb_data_strat.get("pct_change", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+
+  now_dt = datetime.now()
+  current_time_val = now_dt.time()
+  is_friday_val = now_dt.weekday() == 4
+
+  rule_1_sentiment = current_sentiment_score <= -30
+  rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
+  rule_3_friday = is_friday_val
+  rule_4_timing = current_time_val >= dtime(9, 45)
+
+  all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
+
+  with st.container():
+    strat_col1, strat_col2 = st.columns([1, 1])
+
+    with strat_col1:
+      st.markdown("#### 📋 Strategy Checklist")
+      st.markdown(f"**1. Premarket Sentiment (Bearish/Very Bearish):** {'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})")
+      st.markdown(f"**2. IBB Down a Bit (-0.3% to -1.5%):** {'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)")
+      st.markdown(f"**3. Day is Friday:** {'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})")
+      st.markdown(f"**4. Time >= 09:45 AM EST:** {'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
+
+    with strat_col2:
+      st.markdown("#### ⚡ Execution Status")
+      if all_rules_met:
+        st.success("🚨 **ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB**")
+        st.markdown(
+            "<p style='font-size:12px; color:#087f5b;'>All strategy conditions are met. Ensure 15-minute Opening Range Low (ORL) breakout confirmation before order placement.</p>",
+            unsafe_allow_html=True,
+        )
+      else:
+        st.info("⏳ **STATUS: HOLD / NO TRADE**")
+        st.markdown(
+            "<p style='font-size:12px; color:#6c757d;'>Waiting for all premarket, day, and timing conditions to align.</p>",
+            unsafe_allow_html=True,
+        )
+
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
     time.sleep(180)
@@ -1514,4 +1579,3 @@ else:
       "👈 Click Run Screener & Dashboard in the sidebar to fetch live data and"
       " generate the graphs."
   )
-
