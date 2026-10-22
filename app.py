@@ -1532,31 +1532,26 @@ if st.session_state.get("is_running", False):
 
     all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
 
-    # Modern styled container box
-    st.markdown("""
-    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); margin-top: 20px;">
-        <h4 style="margin-top: 0; color: #1e293b; font-size: 16px;">📉 IBB Strategy Monitor</h4>
-        <p style="font-size: 11px; color: #64748b; margin-bottom: 15px;">Evaluates premarket sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+    # Modern styled container box with internal results
+    st.markdown(f"""
+    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); margin-top: 20px;">
+        <h4 style="margin-top: 0; color: #1e293b; font-size: 15px; margin-bottom: 5px;">📉 IBB Strategy Monitor</h4>
+        <p style="font-size: 11px; color: #64748b; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+        
+        <div style="font-size: 12px; color: #334155; line-height: 1.6;">
+            <div><b>1. Sentiment Bearish:</b><br>{'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})</div>
+            <div style="margin-top: 6px;"><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)</div>
+            <div style="margin-top: 6px;"><b>3. Day is Friday:</b><br>{'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})</div>
+            <div style="margin-top: 6px;"><b>4. Time >= 13:30:</b><br>{'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})</div>
+        </div>
+        
+        <hr style='margin: 14px 0; border: none; border-top: 1px solid #f1f5f9;'>
+        
+        <div style="font-size: 13px; font-weight: bold;">
+            {'<span style="color: #059669;">🚨 ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB</span>' if all_rules_met else '<span style="color: #64748b;">⏳ STATUS: HOLD / NO TRADE</span>'}
+        </div>
+    </div>
     """, unsafe_allow_html=True)
-
-    card_col1, card_col2 = st.columns(2)
-
-    with card_col1:
-      st.markdown(f"**1. Sentiment Bearish:**\n{'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})")
-      st.markdown(f"**3. Day is Friday:**\n{'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})")
-
-    with card_col2:
-      st.markdown(f"**2. IBB Drop (-1.5% to -0.3%):**\n{'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)")
-      st.markdown(f"**4. Time >= 13:30:**\n{'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
-
-    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #f1f5f9;'>", unsafe_allow_html=True)
-
-    if all_rules_met:
-      st.success("🚨 **ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB**")
-    else:
-      st.info("⏳ **STATUS: HOLD / NO TRADE**")
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
