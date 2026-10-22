@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time as dtime
 import time
 import feedparser
 import finviz
@@ -1500,6 +1500,64 @@ if st.session_state.get("is_running", False):
 
         st.pyplot(fig)
         plt.close(fig)
+
+    # =========================================================================
+    # MODERN WHITE CARD BOX: IBB STRATEGY MONITOR (UNDER DASHBOARD IMAGE)
+    # =========================================================================
+    current_sentiment_score = 0.0
+    if "df_results" in st.session_state:
+      clean_df_strat = st.session_state["df_results"]
+      clean_df_strat = clean_df_strat[clean_df_strat["Status"] == "OK"]
+      if not clean_df_strat.empty and "Daily Change (%)" in clean_df_strat.columns:
+        ret_strat = pd.to_numeric(clean_df_strat["Daily Change (%)"], errors="coerce").dropna()
+        if not ret_strat.empty:
+          adv_pct = (ret_strat > 0).sum() / len(ret_strat) * 100
+          dec_pct = (ret_strat < 0).sum() / len(ret_strat) * 100
+          breadth_sc = adv_pct - dec_pct
+          mean_ret = float(ret_strat.mean())
+          ret_sc = float(np.clip(mean_ret / 2.0 * 100, -100, 100))
+          current_sentiment_score = float(np.clip(0.70 * breadth_sc + 0.30 * ret_sc, -100, 100))
+
+    ibb_data_strat = st.session_state.get("ibb_info", {})
+    ibb_pct_change = ibb_data_strat.get("pct_change", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+
+    now_dt = datetime.now()
+    current_time_val = now_dt.time()
+    is_friday_val = now_dt.weekday() == 4
+
+    rule_1_sentiment = current_sentiment_score <= -30
+    rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
+    rule_3_friday = is_friday_val
+    rule_4_timing = current_time_val >= dtime(13, 30)
+
+    all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
+
+    r1_txt = "✅ PASS" if rule_1_sentiment else "❌ FAIL"
+    r2_txt = "✅ PASS" if rule_2_ibb_drop else "❌ FAIL"
+    r3_txt = "✅ PASS" if rule_3_friday else "❌ FAIL"
+    r4_txt = "✅ PASS" if rule_4_timing else "❌ FAIL"
+
+    status_txt = '<span style="color: #059669; font-weight: bold;">🚨 ACTION: SHORT IBB ETF (XTB)</span>' if all_rules_met else '<span style="color: #64748b; font-weight: bold;">⏳ STATUS: HOLD / NO TRADE</span>'
+
+    st.markdown(
+        f"""
+        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 15px;">
+            <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
+            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+            <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
+                <div><b>1. Sentiment Bearish:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
+                <div style="margin-top: 6px;"><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
+                <div style="margin-top: 6px;"><b>3. Day is Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
+                <div style="margin-top: 6px;"><b>4. Time >= 13:30:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
+            </div>
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
+            <div style="font-size: 12px;">
+                {status_txt}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
