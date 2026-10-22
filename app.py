@@ -1450,18 +1450,26 @@ if st.session_state.get("is_running", False):
             color="#6c757d",
             fontweight="bold",
         )
-        ax_summary.text(
-            0.05,
-            0.36,
-            f"Stocks analyzed: {total}\nAdvancers: {advancers}"
-            f" ({advance_pct:.1f}%)\nDecliners: {decliners}"
-            f" ({decline_pct:.1f}%)\nMedian return: {median_return:+.2f}%\nMean"
-            f" return: {mean_return:+.2f}%",
-            transform=ax_summary.transAxes,
-            fontsize=9,
-            linespacing=1.4,
-            va="top",
-        )
+        
+        # --- FIXED SECTION: Explicit independent line coordinates for KEY STATISTICS ---
+        stats_lines = [
+            f"Stocks analyzed: {total}",
+            f"Advancers: {advancers} ({advance_pct:.1f}%)",
+            f"Decliners: {decliners} ({decline_pct:.1f}%)",
+            f"Median return: {median_return:+.2f}%",
+            f"Mean return: {mean_return:+.2f}%",
+        ]
+        
+        for i, stat_line in enumerate(stats_lines):
+          ax_summary.text(
+              0.05,
+              0.38 - (i * 0.07),
+              stat_line,
+              transform=ax_summary.transAxes,
+              fontsize=9,
+              va="top",
+          )
+        # ------------------------------------------------------------------------------
 
         ax_distribution.set_title(
             "4. Daily Return Distribution",
