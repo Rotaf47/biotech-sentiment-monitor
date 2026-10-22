@@ -1451,7 +1451,6 @@ if st.session_state.get("is_running", False):
             fontweight="bold",
         )
         
-        # --- FIXED SECTION: Explicit independent line coordinates for KEY STATISTICS ---
         stats_lines = [
             f"Stocks analyzed: {total}",
             f"Advancers: {advancers} ({advance_pct:.1f}%)",
@@ -1469,7 +1468,6 @@ if st.session_state.get("is_running", False):
               fontsize=9,
               va="top",
           )
-        # ------------------------------------------------------------------------------
 
         ax_distribution.set_title(
             "4. Daily Return Distribution",
@@ -1542,7 +1540,7 @@ if st.session_state.get("is_running", False):
     is_friday_val = now_dt.weekday() == 4
 
     rule_1_sentiment = current_sentiment_score <= -30
-    rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
+    rule_2_ibb_drop = ibb_pct_change < -1.5
     rule_3_friday = is_friday_val
     rule_4_timing = current_time_val >= dtime(13, 45)
 
@@ -1562,7 +1560,7 @@ if st.session_state.get("is_running", False):
             <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:45 execution time.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
                 <div><b>1. Sentiment Bearish:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
-                <div style="margin-top: 6px;"><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
+                <div style="margin-top: 6px;"><b>2. IBB Drop (Under -1.5%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
                 <div style="margin-top: 6px;"><b>3. Day is Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
                 <div style="margin-top: 6px;"><b>4. Time >= 13:45:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
             </div>
