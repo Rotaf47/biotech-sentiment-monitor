@@ -1528,7 +1528,7 @@ if st.session_state.get("is_running", False):
     rule_1_sentiment = current_sentiment_score <= -30
     rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
     rule_3_friday = is_friday_val
-    rule_4_timing = current_time_val >= dtime(13, 30)
+    rule_4_timing = current_time_val >= dtime(13, 45)
 
     all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
 
@@ -1543,12 +1543,12 @@ if st.session_state.get("is_running", False):
         f"""
         <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 15px;">
             <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
-            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:45 execution time.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
                 <div><b>1. Sentiment Bearish:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
                 <div style="margin-top: 6px;"><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
                 <div style="margin-top: 6px;"><b>3. Day is Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
-                <div style="margin-top: 6px;"><b>4. Time >= 13:30:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
+                <div style="margin-top: 6px;"><b>4. Time >= 13:45:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
             </div>
             <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
             <div style="font-size: 12px;">
