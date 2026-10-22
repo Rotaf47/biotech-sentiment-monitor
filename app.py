@@ -1502,7 +1502,7 @@ if st.session_state.get("is_running", False):
         plt.close(fig)
 
     # =========================================================================
-    # NATIVE STREAMLIT BORDER CONTAINER: IBB STRATEGY MONITOR
+    # MODERN WHITE CARD BOX: IBB STRATEGY MONITOR (UNDER DASHBOARD IMAGE)
     # =========================================================================
     current_sentiment_score = 0.0
     if "df_results" in st.session_state:
@@ -1532,21 +1532,32 @@ if st.session_state.get("is_running", False):
 
     all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
 
-    with st.container(border=True):
-      st.markdown("##### 📉 IBB Strategy Monitor")
-      st.markdown("<p style='font-size: 11px; color: #64748b; margin-bottom: 10px;'>Evaluates sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>", unsafe_allow_html=True)
-      
-      st.markdown(f"<div style='font-size: 11px; color: #334155; line-height: 1.5;'><b>1. Sentiment Bearish:</b><br>{'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})</div>", unsafe_allow_html=True)
-      st.markdown(f"<div style='font-size: 11px; color: #334155; line-height: 1.5; margin-top: 5px;'><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)</div>", unsafe_allow_html=True)
-      st.markdown(f"<div style='font-size: 11px; color: #334155; line-height: 1.5; margin-top: 5px;'><b>3. Day is Friday:</b><br>{'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})</div>", unsafe_allow_html=True)
-      st.markdown(f"<div style='font-size: 11px; color: #334155; line-height: 1.5; margin-top: 5px;'><b>4. Time >= 13:30:</b><br>{'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})</div>", unsafe_allow_html=True)
-      
-      st.markdown("---")
-      
-      if all_rules_met:
-        st.markdown("<div style='font-size: 12px; font-weight: bold; color: #059669;'>🚨 ACTION: SHORT IBB ETF (XTB)</div>", unsafe_allow_html=True)
-      else:
-        st.markdown("<div style='font-size: 12px; font-weight: bold; color: #64748b;'>⏳ STATUS: HOLD / NO TRADE</div>", unsafe_allow_html=True)
+    r1_txt = "✅ PASS" if rule_1_sentiment else "❌ FAIL"
+    r2_txt = "✅ PASS" if rule_2_ibb_drop else "❌ FAIL"
+    r3_txt = "✅ PASS" if rule_3_friday else "❌ FAIL"
+    r4_txt = "✅ PASS" if rule_4_timing else "❌ FAIL"
+
+    status_txt = '<span style="color: #059669; font-weight: bold;">🚨 ACTION: SHORT IBB ETF (XTB)</span>' if all_rules_met else '<span style="color: #64748b; font-weight: bold;">⏳ STATUS: HOLD / NO TRADE</span>'
+
+    st.markdown(
+        f"""
+        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 15px;">
+            <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
+            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+            <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
+                <div><b>1. Sentiment Bearish:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
+                <div style="margin-top: 6px;"><b>2. IBB Drop (-1.5% to -0.3%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
+                <div style="margin-top: 6px;"><b>3. Day is Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
+                <div style="margin-top: 6px;"><b>4. Time >= 13:30:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
+            </div>
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
+            <div style="font-size: 12px;">
+                {status_txt}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
