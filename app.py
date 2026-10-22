@@ -549,7 +549,7 @@ run_scan = st.sidebar.button("Run Screener & Dashboard", type="primary")
 # Touch-friendly toggle switches
 
 auto_refresh = st.sidebar.toggle(
-    "🔄 Enable Auto-Refresh",
+    "🔄 Enable 3 min Auto-Refresh",
     value=False,
     help="Automatically re-runs the screener every 3 minutes",
 )
