@@ -1501,71 +1501,62 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig)
         plt.close(fig)
 
-  # =========================================================================
-  # IBB ETF SHORT STRATEGY INDICATORS & AUTOMATED MONITOR CARD (MOROCCO TIME)
-  # =========================================================================
-  st.markdown("---")
-  st.markdown("### 📉 IBB ETF Short Strategy Monitor (XTB CFD - Morocco Time)")
-  st.markdown(
-      "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Tracks premarket sentiment, IBB gap conditions, Friday seasonality, and Morocco market time (13:30 entry trigger)."
-      "</p>",
-      unsafe_allow_html=True,
-  )
+    # =========================================================================
+    # MODERN CARD BOX: IBB STRATEGY MONITOR (UNDER THE DASHBOARD IMAGE)
+    # =========================================================================
+    current_sentiment_score = 0.0
+    if "df_results" in st.session_state:
+      clean_df_strat = st.session_state["df_results"]
+      clean_df_strat = clean_df_strat[clean_df_strat["Status"] == "OK"]
+      if not clean_df_strat.empty and "Daily Change (%)" in clean_df_strat.columns:
+        ret_strat = pd.to_numeric(clean_df_strat["Daily Change (%)"], errors="coerce").dropna()
+        if not ret_strat.empty:
+          adv_pct = (ret_strat > 0).sum() / len(ret_strat) * 100
+          dec_pct = (ret_strat < 0).sum() / len(ret_strat) * 100
+          breadth_sc = adv_pct - dec_pct
+          mean_ret = float(ret_strat.mean())
+          ret_sc = float(np.clip(mean_ret / 2.0 * 100, -100, 100))
+          current_sentiment_score = float(np.clip(0.70 * breadth_sc + 0.30 * ret_sc, -100, 100))
 
-  current_sentiment_score = 0.0
-  if "df_results" in st.session_state:
-    clean_df_strat = st.session_state["df_results"]
-    clean_df_strat = clean_df_strat[clean_df_strat["Status"] == "OK"]
-    if not clean_df_strat.empty and "Daily Change (%)" in clean_df_strat.columns:
-      ret_strat = pd.to_numeric(clean_df_strat["Daily Change (%)"], errors="coerce").dropna()
-      if not ret_strat.empty:
-        adv_pct = (ret_strat > 0).sum() / len(ret_strat) * 100
-        dec_pct = (ret_strat < 0).sum() / len(ret_strat) * 100
-        breadth_sc = adv_pct - dec_pct
-        mean_ret = float(ret_strat.mean())
-        ret_sc = float(np.clip(mean_ret / 2.0 * 100, -100, 100))
-        current_sentiment_score = float(np.clip(0.70 * breadth_sc + 0.30 * ret_sc, -100, 100))
+    ibb_data_strat = st.session_state.get("ibb_info", {})
+    ibb_pct_change = ibb_data_strat.get("pct_change", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
 
-  ibb_data_strat = st.session_state.get("ibb_info", {})
-  ibb_pct_change = ibb_data_strat.get("pct_change", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+    now_dt = datetime.now()
+    current_time_val = now_dt.time()
+    is_friday_val = now_dt.weekday() == 4
 
-  now_dt = datetime.now()
-  current_time_val = now_dt.time()
-  is_friday_val = now_dt.weekday() == 4
+    rule_1_sentiment = current_sentiment_score <= -30
+    rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
+    rule_3_friday = is_friday_val
+    rule_4_timing = current_time_val >= dtime(13, 30)
 
-  rule_1_sentiment = current_sentiment_score <= -30
-  rule_2_ibb_drop = -1.5 <= ibb_pct_change <= -0.3
-  rule_3_friday = is_friday_val
-  # Morocco market open + 15 min wait time (9:45 EST corresponds to 13:30 Morocco time)
-  rule_4_timing = current_time_val >= dtime(13, 30)
+    all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
 
-  all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_friday and rule_4_timing
+    # Modern styled container box
+    st.markdown("""
+    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); margin-top: 20px;">
+        <h4 style="margin-top: 0; color: #1e293b; font-size: 16px;">📉 IBB Strategy Monitor</h4>
+        <p style="font-size: 11px; color: #64748b; margin-bottom: 15px;">Evaluates premarket sentiment, gap range, Friday seasonality, and 13:30 execution time.</p>
+    """, unsafe_allow_html=True)
 
-  with st.container():
-    strat_col1, strat_col2 = st.columns([1, 1])
+    card_col1, card_col2 = st.columns(2)
 
-    with strat_col1:
-      st.markdown("#### 📋 Strategy Checklist (Morocco Time)")
-      st.markdown(f"**1. Premarket Sentiment (Bearish/Very Bearish):** {'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})")
-      st.markdown(f"**2. IBB Down a Bit (-0.3% to -1.5%):** {'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)")
-      st.markdown(f"**3. Day is Friday:** {'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})")
-      st.markdown(f"**4. Morocco Time >= 13:30:** {'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
+    with card_col1:
+      st.markdown(f"**1. Sentiment Bearish:**\n{'✅ PASS' if rule_1_sentiment else '❌ FAIL'} (Score: {current_sentiment_score:+.2f})")
+      st.markdown(f"**3. Day is Friday:**\n{'✅ PASS' if rule_3_friday else '❌ FAIL'} ({now_dt.strftime('%A')})")
 
-    with strat_col2:
-      st.markdown("#### ⚡ Execution Status")
-      if all_rules_met:
-        st.success("🚨 **ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB**")
-        st.markdown(
-            "<p style='font-size:12px; color:#087f5b;'>All strategy conditions are met under Morocco time. Ensure 15-minute Opening Range Low (ORL) breakout confirmation before order placement.</p>",
-            unsafe_allow_html=True,
-        )
-      else:
-        st.info("⏳ **STATUS: HOLD / NO TRADE**")
-        st.markdown(
-            "<p style='font-size:12px; color:#6c757d;'>Waiting for all premarket, day, and 13:30 Morocco time conditions to align.</p>",
-            unsafe_allow_html=True,
-        )
+    with card_col2:
+      st.markdown(f"**2. IBB Drop (-1.5% to -0.3%):**\n{'✅ PASS' if rule_2_ibb_drop else '❌ FAIL'} ({ibb_pct_change:+.2f}%)")
+      st.markdown(f"**4. Time >= 13:30:**\n{'✅ PASS' if rule_4_timing else '❌ FAIL'} ({current_time_val.strftime('%H:%M:%S')})")
+
+    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #f1f5f9;'>", unsafe_allow_html=True)
+
+    if all_rules_met:
+      st.success("🚨 **ACTION: ENTER SHORT POSITION ON IBB ETF (CFD) ON XTB**")
+    else:
+      st.info("⏳ **STATUS: HOLD / NO TRADE**")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
   if auto_refresh:
     st.info("⏳ Auto-refreshing in 3 minute...")
