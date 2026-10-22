@@ -1270,9 +1270,14 @@ if st.session_state.get("is_running", False):
         else:
           sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
 
-        fig = plt.figure(figsize=(16, 10), constrained_layout=True)
+        fig = plt.figure(figsize=(16, 8.5))
         gs = fig.add_gridspec(
-            2, 2, height_ratios=[0.85, 1.15], width_ratios=[1.15, 1.0]
+            2,
+            2,
+            height_ratios=[0.85, 1.15],
+            width_ratios=[1.15, 1.0],
+            hspace=0.22,
+            wspace=0.18,
         )
 
         ax_score = fig.add_subplot(gs[0, 0])
@@ -1281,7 +1286,10 @@ if st.session_state.get("is_running", False):
         ax_distribution = fig.add_subplot(gs[1, 1])
 
         fig.suptitle(
-            "BIOTECH SECTOR SENTIMENT DASHBOARD", fontsize=18, fontweight="bold"
+            "BIOTECH SECTOR SENTIMENT DASHBOARD",
+            fontsize=18,
+            fontweight="bold",
+            y=0.98,
         )
 
         for ax in [ax_score, ax_breadth, ax_summary, ax_distribution]:
@@ -1498,7 +1506,7 @@ if st.session_state.get("is_running", False):
         for spine in ["top", "right"]:
           ax_distribution.spines[spine].set_visible(False)
 
-        st.pyplot(fig)
+        st.pyplot(fig, bbox_inches="tight")
         plt.close(fig)
 
     # =========================================================================
@@ -1541,7 +1549,7 @@ if st.session_state.get("is_running", False):
 
     st.markdown(
         f"""
-        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 15px; margin-bottom: 8px;">
+        <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 5px; margin-bottom: 8px;">
             <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
             <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Friday seasonality, and 13:45 execution time.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
