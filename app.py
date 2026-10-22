@@ -1270,7 +1270,8 @@ if st.session_state.get("is_running", False):
         else:
           sentiment, sentiment_color = "VERY BULLISH", "#087f5b"
 
-        fig = plt.figure(figsize=(16, 8.5))
+        # Fixed dimensions to match regular mode exactly
+        fig = plt.figure(figsize=(14, 7.5))
         gs = fig.add_gridspec(
             2,
             2,
@@ -1512,7 +1513,8 @@ if st.session_state.get("is_running", False):
         for spine in ["top", "right"]:
           ax_distribution.spines[spine].set_visible(False)
 
-        st.pyplot(fig, bbox_inches="tight")
+        # Explicitly disable container stretching to keep dimensions locked
+        st.pyplot(fig, use_container_width=False)
         plt.close(fig)
 
     # =========================================================================
