@@ -761,12 +761,21 @@ def fetch_screener_data(ticker_list):
 def fetch_ibb_data():
   try:
     ibb = yf.Ticker("IBB")
-    hist = ibb.history(period="1mo")
+    hist = ibb.history(period="3mo")
     if len(hist) >= 5:
       prev_close = float(hist["Close"].iloc[-2])
       latest_close = float(hist["Close"].iloc[-1])
       change = latest_close - prev_close
       pct_change = (change / prev_close) * 100
+
+      # Volume & RVOL Calculation
+      latest_volume = float(hist["Volume"].iloc[-1])
+      if len(hist) > 1:
+        avg_volume = float(hist["Volume"].iloc[:-1].tail(63).mean())
+      else:
+        avg_volume = 0.0
+
+      ibb_rvol = (latest_volume / avg_volume) if avg_volume > 0 else 0.0
 
       high = hist["High"]
       low = hist["Low"]
@@ -799,6 +808,9 @@ def fetch_ibb_data():
           "price": latest_close,
           "change": change,
           "pct_change": pct_change,
+          "volume": latest_volume,
+          "avg_volume": avg_volume,
+          "rvol": ibb_rvol,
           "cmf": cmf_5,
           "price_5d_change": price_5d_change,
           "divergence_info": divergence_info,
@@ -1536,24 +1548,35 @@ if st.session_state.get("is_running", False):
 
     ibb_data_strat = st.session_state.get("ibb_info", {})
     ibb_pct_change = ibb_data_strat.get("pct_change", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+    ibb_rvol = ibb_data_strat.get("rvol", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+    ibb_vol = ibb_data_strat.get("volume", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
+    ibb_avg_vol = ibb_data_strat.get("avg_volume", 0.0) if ibb_data_strat.get("status") == "OK" else 0.0
 
     now_dt = datetime.now()
     current_time_val = now_dt.time()
     
-    # Updated condition: Checks for Thursday (weekday() == 3) through Friday (weekday() == 4)
+    # Checks for Thursday (weekday() == 3) through Friday (weekday() == 4)
     is_thurs_fri_val = now_dt.weekday() in [3, 4]
 
     rule_1_sentiment = current_sentiment_score <= -30
     rule_2_ibb_drop = ibb_pct_change < -1.5
     rule_3_thurs_fri = is_thurs_fri_val
     rule_4_timing = current_time_val >= dtime(15, 0)
+    rule_5_volume = ibb_rvol >= 1.0
 
-    all_rules_met = rule_1_sentiment and rule_2_ibb_drop and rule_3_thurs_fri and rule_4_timing
+    all_rules_met = (
+        rule_1_sentiment 
+        and rule_2_ibb_drop 
+        and rule_3_thurs_fri 
+        and rule_4_timing 
+        and rule_5_volume
+    )
 
     r1_txt = "✅ PASS" if rule_1_sentiment else "❌ FAIL"
     r2_txt = "✅ PASS" if rule_2_ibb_drop else "❌ FAIL"
     r3_txt = "✅ PASS" if rule_3_thurs_fri else "❌ FAIL"
     r4_txt = "✅ PASS" if rule_4_timing else "❌ FAIL"
+    r5_txt = "✅ PASS" if rule_5_volume else "❌ FAIL"
 
     status_txt = '<span style="color: #059669; font-weight: bold;">🚨 ACTION: SHORT IBB ETF (XTB)</span>' if all_rules_met else '<span style="color: #64748b; font-weight: bold;">⏳ STATUS: HOLD / NO TRADE</span>'
 
@@ -1561,12 +1584,13 @@ if st.session_state.get("is_running", False):
         f"""
         <div style="background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 5px; margin-bottom: 5px;">
             <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
-            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Thursday-to-Friday seasonality, and 15:00 execution time.</p>
+            <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Thursday-to-Friday seasonality, 15:00 execution time, and volume confirmation.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
                 <div><b>1. Sentiment Bearish:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
                 <div style="margin-top: 6px;"><b>2. IBB Drop (Under -1.5%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
                 <div style="margin-top: 6px;"><b>3. Day is Thursday or Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
                 <div style="margin-top: 6px;"><b>4. Time >= 15:00:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
+                <div style="margin-top: 6px;"><b>5. Volume Above Avg (RVOL >= 1.0x):</b><br>{r5_txt} ({ibb_rvol:.2f}x | {ibb_vol/1e6:.2f}M vs {ibb_avg_vol/1e6:.2f}M avg)</div>
             </div>
             <hr style="margin: 12px 0; border: none; border-top: 1px solid #e2e8f0;">
             <div style="font-size: 12px;">
