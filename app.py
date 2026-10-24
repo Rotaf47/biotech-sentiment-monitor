@@ -1076,17 +1076,15 @@ if st.session_state.get("is_running", False):
   current_entry_links = {entry["link"] for entry in clinical_rss_entries}
   if "last_seen_rss_links" not in st.session_state:
     st.session_state["last_seen_rss_links"] = current_entry_links
-    has_new_rss_cards = False
-  else:
-    new_links = current_entry_links - st.session_state["last_seen_rss_links"]
-    has_new_rss_cards = len(new_links) > 0
-    if has_new_rss_cards:
-      st.session_state["last_seen_rss_links"] = current_entry_links
 
-  if has_new_rss_cards:
+  # Trigger bell ONLY if RVOL condition is met (e.g., IBB RVOL >= 1.0) using alert.mp3
+  ibb_rvol_val = ibb_info.get("rvol", 0.0) if ibb_info.get("status") == "OK" else 0.0
+  rvol_condition_met = ibb_rvol_val >= 1.0
+
+  if rvol_condition_met:
     audio_html = """
     <audio autoplay>
-      <source src="https://actions.google.com/sounds/v1/cartoon/jingle_bells.ogg" type="audio/ogg">
+      <source src="alert.mp3" type="audio/mpeg">
     </audio>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
