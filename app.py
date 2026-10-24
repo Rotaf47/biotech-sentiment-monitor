@@ -1587,7 +1587,7 @@ if st.session_state.get("is_running", False):
             <h4 style="margin-top: 0; color: #0f172a; font-size: 15px; margin-bottom: 4px;">📉 IBB Strategy Monitor</h4>
             <p style="font-size: 11px; color: #475569; margin-bottom: 12px;">Evaluates sentiment, gap range, Thursday-to-Friday seasonality, 15:00 execution time, and volume confirmation.</p>
             <div style="font-size: 11px; color: #1e293b; line-height: 1.5;">
-                <div><b>1. Sentiment <= 0:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
+                <div><b>1. Bearish Sentiment:</b><br>{r1_txt} (Score: {current_sentiment_score:+.2f})</div>
                 <div style="margin-top: 6px;"><b>2. IBB Drop (Under -1.5%):</b><br>{r2_txt} ({ibb_pct_change:+.2f}%)</div>
                 <div style="margin-top: 6px;"><b>3. Day is Thursday or Friday:</b><br>{r3_txt} ({now_dt.strftime('%A')})</div>
                 <div style="margin-top: 6px;"><b>4. Time >= 15:00:</b><br>{r4_txt} ({current_time_val.strftime('%H:%M:%S')})</div>
