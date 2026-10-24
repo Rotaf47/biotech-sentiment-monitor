@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, time as dtime
 import time
 import feedparser
@@ -1073,21 +1074,23 @@ if st.session_state.get("is_running", False):
       unsafe_allow_html=True,
   )
 
-  current_entry_links = {entry["link"] for entry in clinical_rss_entries}
-  if "last_seen_rss_links" not in st.session_state:
-    st.session_state["last_seen_rss_links"] = current_entry_links
-
-  # Trigger bell ONLY if RVOL condition is met (e.g., IBB RVOL >= 1.0) using alert.mp3
+  # Trigger bell ONLY if RVOL condition is met (IBB RVOL >= 1.0) using Base64 alert.mp3
   ibb_rvol_val = ibb_info.get("rvol", 0.0) if ibb_info.get("status") == "OK" else 0.0
   rvol_condition_met = ibb_rvol_val >= 1.0
 
   if rvol_condition_met:
-    audio_html = """
-    <audio autoplay>
-      <source src="alert.mp3" type="audio/mpeg">
-    </audio>
-    """
-    st.markdown(audio_html, unsafe_allow_html=True)
+    try:
+      with open("alert.mp3", "rb") as f:
+        audio_bytes = f.read()
+      audio_base64 = base64.b64encode(audio_bytes).decode()
+      audio_html = f"""
+      <audio autoplay>
+        <source src="data:audio/mpeg;base64,{audio_base64}" type="audio/mpeg">
+      </audio>
+      """
+      st.markdown(audio_html, unsafe_allow_html=True)
+    except Exception:
+      pass
 
   advancing_tickers_pct = df[
       (df["Status"] == "OK") & (df["Daily Change (%)"] > 5.0)
