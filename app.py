@@ -1125,7 +1125,7 @@ if st.session_state.get("is_running", False):
         pub_badge = (
             f"<span style='background-color: #f1f3f5; color: #495057;"
             f" padding: 2px 6px; border-radius: 4px; font-size: 9px; float:"
-            f" right;'>🕒 {published}</span>"
+             f" right;'>🕒 {published}</span>"
             if published
             else ""
         )
@@ -1605,7 +1605,7 @@ if st.session_state.get("is_running", False):
     )
 
   # =========================================================================
-  # NEW SECTION: MODERN GOOGLE TRENDS-INSPIRED IBB PLOT AT THE BOTTOM
+  # FIXED MODERN GOOGLE TRENDS-INSPIRED IBB PLOT AT THE BOTTOM
   # =========================================================================
   st.markdown("---")
   st.markdown("### 📈 IBB Sector Trend Analysis (Modern Dashboard View)")
@@ -1628,14 +1628,17 @@ if st.session_state.get("is_running", False):
       chart_prices = chart_data["Close"].dropna()
       
       if len(chart_prices) > 3:
-        x_vals = pd.to_numeric(chart_prices.index)
+        # Use matplotlib date numbers to prevent floating-point precision loss
+        x_vals = mdates.date2num(chart_prices.index.to_pydatetime())
         y_vals = chart_prices.values
 
         # Generate smooth spline curve points
         X_smooth = np.linspace(x_vals.min(), x_vals.max(), 500)
         spline = make_interp_spline(x_vals, y_vals, k=3)
         Y_smooth = spline(X_smooth)
-        X_smooth_dt = pd.to_datetime(X_smooth)
+        
+        # Convert numeric matplotlib numbers back to datetime objects
+        X_smooth_dt = mdates.num2date(X_smooth)
 
         # Plot setup with Google UI feel
         fig_trend, ax_trend = plt.subplots(figsize=(12, 5.5), facecolor='#FFFFFF')
