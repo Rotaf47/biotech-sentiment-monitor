@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
-from scipy.interpolate import make_interp_spline
+from pytrends.request import TrendReq
 
 
 # Page Configuration
@@ -1125,7 +1125,7 @@ if st.session_state.get("is_running", False):
         pub_badge = (
             f"<span style='background-color: #f1f3f5; color: #495057;"
             f" padding: 2px 6px; border-radius: 4px; font-size: 9px; float:"
-             f" right;'>🕒 {published}</span>"
+            f" right;'>🕒 {published}</span>"
             if published
             else ""
         )
@@ -1605,69 +1605,54 @@ if st.session_state.get("is_running", False):
     )
 
   # =========================================================================
-  # FIXED MODERN GOOGLE TRENDS-INSPIRED IBB PLOT AT THE BOTTOM
+  # GOOGLE TRENDS "THERAPEUTICS" SEARCH INTEREST PLOT (CORRECTED)
   # =========================================================================
   st.markdown("---")
-  st.markdown("### 📈 IBB Sector Trend Analysis (Modern Dashboard View)")
+  st.markdown("### 🔍 Google Trends: 'Therapeutics' Search Interest (US, Past 7 Days)")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "High-resolution cubic spline trend plot styled with modern web dashboard aesthetics."
+      "Live search volume index via PyTrends (Finance Category) styled with modern Google web aesthetics."
       "</p>",
       unsafe_allow_html=True,
   )
 
   try:
-    # Fetch recent IBB history for the plot
-    ibb_ticker_obj = yf.Ticker("IBB")
-    chart_data = ibb_ticker_obj.history(period="7d", interval="1h")
-    
-    if chart_data.empty:
-      chart_data = ibb_ticker_obj.history(period="1mo", interval="1d")
+    pytrends = TrendReq(hl='en-US', tz=360)
+    keyword = 'Therapeutics'
+    pytrends.build_payload([keyword], cat=7, timeframe='now 7-d', geo='US')
+    g_data = pytrends.interest_over_time()
 
-    if not chart_data.empty and "Close" in chart_data.columns:
-      chart_prices = chart_data["Close"].dropna()
-      
-      if len(chart_prices) > 3:
-        # Use matplotlib date numbers to prevent floating-point precision loss
-        x_vals = mdates.date2num(chart_prices.index.to_pydatetime())
-        y_vals = chart_prices.values
+    if not g_data.empty:
+      if 'isPartial' in g_data.columns:
+        g_data = g_data.drop(columns=['isPartial'])
 
-        # Generate smooth spline curve points
-        X_smooth = np.linspace(x_vals.min(), x_vals.max(), 500)
-        spline = make_interp_spline(x_vals, y_vals, k=3)
-        Y_smooth = spline(X_smooth)
-        
-        # Convert numeric matplotlib numbers back to datetime objects
-        X_smooth_dt = mdates.num2date(X_smooth)
+      if keyword in g_data.columns:
+        x_vals = mdates.date2num(g_data.index.to_pydatetime())
+        y_vals = g_data[keyword].values
 
-        # Plot setup with Google UI feel
+        # Optional gentle smoothing or direct plotting to avoid artificial over-smoothing
         fig_trend, ax_trend = plt.subplots(figsize=(12, 5.5), facecolor='#FFFFFF')
         ax_trend.set_facecolor('#FFFFFF')
 
-        primary_color = '#1a73e8'  # Classic Google Blue
+        primary_color = '#1a73e8'  # Google Blue
         fill_color = '#e8f0fe'     # Soft blue gradient fill
-        grid_color = '#f1f3f4'     # Subtle gridline color
-        text_color = '#3c4043'     # Dark gray text color
+        grid_color = '#f1f3f4'     # Light gray grid
+        text_color = '#3c4043'     # Dark gray text
 
-        # Plot smooth curve & area fill
-        ax_trend.plot(X_smooth_dt, Y_smooth, linestyle='-', color=primary_color, linewidth=2.5, zorder=3)
-        ax_trend.fill_between(X_smooth_dt, Y_smooth, color=fill_color, alpha=0.8, zorder=2)
-        ax_trend.scatter(chart_prices.index, chart_prices.values, color=primary_color, alpha=0.3, s=15, zorder=4)
+        # Plot clean line with fill and natural point markers
+        ax_trend.plot(g_data.index, y_vals, linestyle='-', color=primary_color, linewidth=2.2, zorder=3)
+        ax_trend.fill_between(g_data.index, y_vals, color=fill_color, alpha=0.8, zorder=2)
+        ax_trend.scatter(g_data.index, y_vals, color=primary_color, alpha=0.5, s=20, zorder=4)
 
-        # Clean minimal borders
+        # Minimal borders & grid
         ax_trend.spines['top'].set_visible(False)
         ax_trend.spines['right'].set_visible(False)
         ax_trend.spines['left'].set_color('#dadce0')
         ax_trend.spines['bottom'].set_color('#dadce0')
-        ax_trend.spines['left'].set_linewidth(1)
-        ax_trend.spines['bottom'].set_linewidth(1)
-
-        # Grid lines
         ax_trend.yaxis.grid(True, linestyle='-', color=grid_color, alpha=1.0, zorder=1)
         ax_trend.xaxis.grid(False)
 
-        # Formatting titles & ticks
-        ax_trend.set_title("iShares Biotechnology ETF (IBB) - Smoothed Trend", fontsize=14, fontweight='bold', color=text_color, loc='left', pad=15)
+        ax_trend.set_title(f"Google Trends: '{keyword}' (US, Past 7 Days)", fontsize=14, fontweight='bold', color=text_color, loc='left', pad=15)
         ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %H:%M'))
         plt.xticks(fontsize=10, color=text_color)
         plt.yticks(fontsize=10, color=text_color)
@@ -1678,11 +1663,11 @@ if st.session_state.get("is_running", False):
         st.pyplot(fig_trend, use_container_width=True)
         plt.close(fig_trend)
       else:
-        st.info("Insufficient data points available to generate the smoothed trend plot.")
+        st.info("Keyword data not found in Google Trends return columns.")
     else:
-      st.info("Could not load historical price data for the IBB trend chart.")
+      st.warning("No Google Trends data returned. Google may be rate-limiting requests temporarily.")
   except Exception as e:
-    st.warning(f"Error generating trend chart: {e}")
+    st.info(f"Google Trends fetch currently unavailable or rate-limited: {e}")
 
   if auto_refresh:
     time.sleep(180)
