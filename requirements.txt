@@ -6,3 +6,4 @@ yfinance
 finviz
 feedparser
 scipy
+pytrends
