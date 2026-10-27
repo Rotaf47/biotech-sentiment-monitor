@@ -9,7 +9,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
-from pytrends.request import TrendReq
+
+try:
+  from pytrends.request import TrendReq
+except ImportError:
+  TrendReq = None
 
 
 # Page Configuration
@@ -1605,67 +1609,72 @@ if st.session_state.get("is_running", False):
     )
 
   # =========================================================================
-  # GOOGLE TRENDS "THERAPEUTICS" SEARCH INTEREST PLOT (CORRECTED)
+  # CONTINUOUS & SMOOTHED GOOGLE TRENDS "THERAPEUTICS" SEARCH INTEREST PLOT
   # =========================================================================
   st.markdown("---")
   st.markdown("### 🔍 Google Trends: 'Therapeutics' Search Interest (US, Past 7 Days)")
   st.markdown(
       "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
-      "Live search volume index via PyTrends (Finance Category) styled with modern Google web aesthetics."
+      "Continuous live search volume index via PyTrends (Finance Category) with natural rolling average smoothing."
       "</p>",
       unsafe_allow_html=True,
   )
 
   try:
-    pytrends = TrendReq(hl='en-US', tz=360)
-    keyword = 'Therapeutics'
-    pytrends.build_payload([keyword], cat=7, timeframe='now 7-d', geo='US')
-    g_data = pytrends.interest_over_time()
+    if TrendReq is not None:
+      pytrends = TrendReq(hl='en-US', tz=360)
+      keyword = 'Therapeutics'
+      pytrends.build_payload([keyword], cat=7, timeframe='now 7-d', geo='US')
+      g_data = pytrends.interest_over_time()
 
-    if not g_data.empty:
-      if 'isPartial' in g_data.columns:
-        g_data = g_data.drop(columns=['isPartial'])
+      if not g_data.empty:
+        if 'isPartial' in g_data.columns:
+          g_data = g_data.drop(columns=['isPartial'])
 
-      if keyword in g_data.columns:
-        x_vals = mdates.date2num(g_data.index.to_pydatetime())
-        y_vals = g_data[keyword].values
+        if keyword in g_data.columns:
+          # Clean and fill gaps so the line never drops to zero/bottom artificially
+          clean_series = g_data[keyword].replace(0, np.nan).ffill().bfill()
+          
+          # Apply a gentle rolling average for natural smoothing without over-flattening
+          smoothed_y = clean_series.rolling(window=3, min_periods=1, center=True).mean().values
 
-        # Optional gentle smoothing or direct plotting to avoid artificial over-smoothing
-        fig_trend, ax_trend = plt.subplots(figsize=(12, 5.5), facecolor='#FFFFFF')
-        ax_trend.set_facecolor('#FFFFFF')
+          fig_trend, ax_trend = plt.subplots(figsize=(12, 5.5), facecolor='#FFFFFF')
+          ax_trend.set_facecolor('#FFFFFF')
 
-        primary_color = '#1a73e8'  # Google Blue
-        fill_color = '#e8f0fe'     # Soft blue gradient fill
-        grid_color = '#f1f3f4'     # Light gray grid
-        text_color = '#3c4043'     # Dark gray text
+          primary_color = '#1a73e8'  # Google Blue
+          fill_color = '#e8f0fe'     # Soft blue gradient fill
+          grid_color = '#f1f3f4'     # Light gray grid
+          text_color = '#3c4043'     # Dark gray text
 
-        # Plot clean line with fill and natural point markers
-        ax_trend.plot(g_data.index, y_vals, linestyle='-', color=primary_color, linewidth=2.2, zorder=3)
-        ax_trend.fill_between(g_data.index, y_vals, color=fill_color, alpha=0.8, zorder=2)
-        ax_trend.scatter(g_data.index, y_vals, color=primary_color, alpha=0.5, s=20, zorder=4)
+          # Plot continuous line with fill and natural point markers
+          ax_trend.plot(g_data.index, smoothed_y, linestyle='-', color=primary_color, linewidth=2.5, zorder=3)
+          ax_trend.fill_between(g_data.index, smoothed_y, color=fill_color, alpha=0.8, zorder=2)
+          ax_trend.scatter(g_data.index, g_data[keyword].values, color=primary_color, alpha=0.4, s=15, zorder=4)
 
-        # Minimal borders & grid
-        ax_trend.spines['top'].set_visible(False)
-        ax_trend.spines['right'].set_visible(False)
-        ax_trend.spines['left'].set_color('#dadce0')
-        ax_trend.spines['bottom'].set_color('#dadce0')
-        ax_trend.yaxis.grid(True, linestyle='-', color=grid_color, alpha=1.0, zorder=1)
-        ax_trend.xaxis.grid(False)
+          # Minimal borders & grid
+          ax_trend.spines['top'].set_visible(False)
+          ax_trend.spines['right'].set_visible(False)
+          ax_trend.spines['left'].set_color('#dadce0')
+          ax_trend.spines['bottom'].set_color('#dadce0')
+          ax_trend.yaxis.grid(True, linestyle='-', color=grid_color, alpha=1.0, zorder=1)
+          ax_trend.xaxis.grid(False)
 
-        ax_trend.set_title(f"Google Trends: '{keyword}' (US, Past 7 Days)", fontsize=14, fontweight='bold', color=text_color, loc='left', pad=15)
-        ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %H:%M'))
-        plt.xticks(fontsize=10, color=text_color)
-        plt.yticks(fontsize=10, color=text_color)
+          ax_trend.set_title(f"Google Trends: '{keyword}' (US, Past 7 Days - Continuous)", fontsize=14, fontweight='bold', color=text_color, loc='left', pad=15)
+          ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %H:%M'))
+          plt.xticks(fontsize=10, color=text_color)
+          plt.yticks(fontsize=10, color=text_color)
 
-        plt.margins(x=0.01)
-        plt.tight_layout()
+          plt.margins(x=0.01)
+          plt.tight_layout()
 
-        st.pyplot(fig_trend, use_container_width=True)
-        plt.close(fig_trend)
+          st.pyplot(fig_trend, use_container_width=True)
+          plt.close(fig_trend)
+        else:
+          st.info("Keyword data not found in Google Trends return columns.")
       else:
-        st.info("Keyword data not found in Google Trends return columns.")
+        st.warning("No Google Trends data returned. Google may be rate-limiting requests temporarily.")
     else:
-      st.warning("No Google Trends data returned. Google may be rate-limiting requests temporarily.")
+      st.error("pytrends package is not installed.")
   except Exception as e:
     st.info(f"Google Trends fetch currently unavailable or rate-limited: {e}")
 
