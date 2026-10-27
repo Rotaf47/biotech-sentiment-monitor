@@ -1,8 +1,8 @@
-alpaca-py
-feedparser
-matplotlib
-numpy
-pandas
 streamlit
+pandas
+numpy
+matplotlib
 yfinance
 finviz
+feedparser
+scipy
