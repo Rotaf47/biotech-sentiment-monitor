@@ -4,10 +4,12 @@ import time
 import feedparser
 import finviz
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
+from scipy.interpolate import make_interp_spline
 
 
 # Page Configuration
@@ -1601,6 +1603,83 @@ if st.session_state.get("is_running", False):
         """,
         unsafe_allow_html=True
     )
+
+  # =========================================================================
+  # NEW SECTION: MODERN GOOGLE TRENDS-INSPIRED IBB PLOT AT THE BOTTOM
+  # =========================================================================
+  st.markdown("---")
+  st.markdown("### 📈 IBB Sector Trend Analysis (Modern Dashboard View)")
+  st.markdown(
+      "<p style='font-size:12px; color:#6c757d; margin-bottom:15px;'>"
+      "High-resolution cubic spline trend plot styled with modern web dashboard aesthetics."
+      "</p>",
+      unsafe_allow_html=True,
+  )
+
+  try:
+    # Fetch recent IBB history for the plot
+    ibb_ticker_obj = yf.Ticker("IBB")
+    chart_data = ibb_ticker_obj.history(period="7d", interval="1h")
+    
+    if chart_data.empty:
+      chart_data = ibb_ticker_obj.history(period="1mo", interval="1d")
+
+    if not chart_data.empty and "Close" in chart_data.columns:
+      chart_prices = chart_data["Close"].dropna()
+      
+      if len(chart_prices) > 3:
+        x_vals = pd.to_numeric(chart_prices.index)
+        y_vals = chart_prices.values
+
+        # Generate smooth spline curve points
+        X_smooth = np.linspace(x_vals.min(), x_vals.max(), 500)
+        spline = make_interp_spline(x_vals, y_vals, k=3)
+        Y_smooth = spline(X_smooth)
+        X_smooth_dt = pd.to_datetime(X_smooth)
+
+        # Plot setup with Google UI feel
+        fig_trend, ax_trend = plt.subplots(figsize=(12, 5.5), facecolor='#FFFFFF')
+        ax_trend.set_facecolor('#FFFFFF')
+
+        primary_color = '#1a73e8'  # Classic Google Blue
+        fill_color = '#e8f0fe'     # Soft blue gradient fill
+        grid_color = '#f1f3f4'     # Subtle gridline color
+        text_color = '#3c4043'     # Dark gray text color
+
+        # Plot smooth curve & area fill
+        ax_trend.plot(X_smooth_dt, Y_smooth, linestyle='-', color=primary_color, linewidth=2.5, zorder=3)
+        ax_trend.fill_between(X_smooth_dt, Y_smooth, color=fill_color, alpha=0.8, zorder=2)
+        ax_trend.scatter(chart_prices.index, chart_prices.values, color=primary_color, alpha=0.3, s=15, zorder=4)
+
+        # Clean minimal borders
+        ax_trend.spines['top'].set_visible(False)
+        ax_trend.spines['right'].set_visible(False)
+        ax_trend.spines['left'].set_color('#dadce0')
+        ax_trend.spines['bottom'].set_color('#dadce0')
+        ax_trend.spines['left'].set_linewidth(1)
+        ax_trend.spines['bottom'].set_linewidth(1)
+
+        # Grid lines
+        ax_trend.yaxis.grid(True, linestyle='-', color=grid_color, alpha=1.0, zorder=1)
+        ax_trend.xaxis.grid(False)
+
+        # Formatting titles & ticks
+        ax_trend.set_title("iShares Biotechnology ETF (IBB) - Smoothed Trend", fontsize=14, fontweight='bold', color=text_color, loc='left', pad=15)
+        ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %H:%M'))
+        plt.xticks(fontsize=10, color=text_color)
+        plt.yticks(fontsize=10, color=text_color)
+
+        plt.margins(x=0.01)
+        plt.tight_layout()
+
+        st.pyplot(fig_trend, use_container_width=True)
+        plt.close(fig_trend)
+      else:
+        st.info("Insufficient data points available to generate the smoothed trend plot.")
+    else:
+      st.info("Could not load historical price data for the IBB trend chart.")
+  except Exception as e:
+    st.warning(f"Error generating trend chart: {e}")
 
   if auto_refresh:
     time.sleep(180)
